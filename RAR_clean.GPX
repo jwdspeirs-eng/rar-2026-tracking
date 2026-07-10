@@ -1,0 +1,322 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<gpx xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3" xmlns:uuidx="http://www.garmin.com/xmlschemas/IdentifierExtension/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" creator="GPSMAP 8612xsv" version="1.1" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd http://www.garmin.com/xmlschemas/GpxExtensions/v3 http://www8.garmin.com/xmlschemas/GpxExtensionsv3.xsd http://www.garmin.com/xmlschemas/WaypointExtension/v1 http://www8.garmin.com/xmlschemas/WaypointExtensionv1.xsd http://www.garmin.com/xmlschemas/TrackPointExtension/v1 http://www.garmin.com/xmlschemas/TrackPointExtensionv1.xsd http://www.garmin.com/xmlschemas/IdentifierExtension/v1 http://www.garmin.com/xmlschemas/IdentifierExtension.xsd">
+    <metadata>
+        <link href="http://www.garmin.com">
+            <text>Garmin International</text>
+        </link>
+        <time>2026-06-26T00:42:38Z</time>
+    </metadata>
+    <rte>
+        <name>RAR</name>
+        <extensions>
+            <gpxx:RouteExtension>
+                <gpxx:IsAutoNamed>false</gpxx:IsAutoNamed>
+            </gpxx:RouteExtension>
+            <uuidx:uuid>2818ac9b-a350-4612-b0ad-3e0415fd038f</uuidx:uuid>
+        </extensions>
+        <rtept lat="48.7695758790" lon="-123.4570058808">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7691036426" lon="-123.4564714506">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7681379635" lon="-123.4552476089">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7661378738" lon="-123.4534295741">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7609213125" lon="-123.4468740039">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7559172325" lon="-123.4421387315">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7497451343" lon="-123.4333318658">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7442632858" lon="-123.4301666077">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7377750222" lon="-123.4244637284">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7325162999" lon="-123.4231320955">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7289314438" lon="-123.4276439063">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7157167867" lon="-123.4584499989">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7111034710" lon="-123.4772376157">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7101637758" lon="-123.4983574972">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7210989743" lon="-123.5109258257">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7345117796" lon="-123.5341188870">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7443361245" lon="-123.5544652864">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7579196692" lon="-123.5628882609">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7694835942" lon="-123.5672293324">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7765943818" lon="-123.5556742083">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7859777547" lon="-123.5526750796">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7941825483" lon="-123.5534413531">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7951504067" lon="-123.5372832231">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7912373990" lon="-123.5227208398">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8059219904" lon="-123.5504399613">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8123180531" lon="-123.5602803994">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8148845918" lon="-123.5706316307">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8215747755" lon="-123.5776601918">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8323044498" lon="-123.5770271905">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8440858852" lon="-123.5751096625">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8556992635" lon="-123.5698720627">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8659662567" lon="-123.5761388764">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8740027416" lon="-123.5820876807">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8836383261" lon="-123.5836868640">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8909179252" lon="-123.5901479702">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8995014969" lon="-123.5961639974">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.9087162260" lon="-123.5974440817">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.9193619136" lon="-123.5980854649">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.9293761924" lon="-123.6017994024">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.9393484779" lon="-123.6025063321">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.9489419851" lon="-123.5969980806">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.9440190420" lon="-123.5802161694">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.9352673292" lon="-123.5647813138">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.9279039949" lon="-123.5493457876">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.9228548203" lon="-123.5430050455">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.9181000181" lon="-123.5234106705">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.9041727316" lon="-123.5032393690">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8865424879" lon="-123.4755251929">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8761916757" lon="-123.4549158532">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8621379063" lon="-123.4304092638">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8414780237" lon="-123.4160215594">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8366813120" lon="-123.4311166126">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8419829495" lon="-123.4377689101">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8502020761" lon="-123.4474848770">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8438623399" lon="-123.4419350512">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8255686685" lon="-123.4386625886">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8122618105" lon="-123.4221363254">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.8024960551" lon="-123.4099471103">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7997915503" lon="-123.3937521838">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7963144854" lon="-123.3890598267">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7880189158" lon="-123.3777679782">
+            <time>2025-08-01T21:44:58Z</time>
+            <name>0029</name>
+            <sym>Anchor</sym>
+            <extensions>
+                <uuidx:uuid>3261eb3c-a41d-48f9-9af3-7aeb5f84f33f</uuidx:uuid>
+            </extensions>
+        </rtept>
+        <rtept lat="48.7812902592" lon="-123.3716615941">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7750012334" lon="-123.3633237798">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7655145116" lon="-123.3695444092">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7538814358" lon="-123.3811380900">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7524648942" lon="-123.3931848127">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7530873343" lon="-123.4173760749">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7549331971" lon="-123.4337842371">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7621729821" lon="-123.4433928318">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7675888650" lon="-123.4519954305">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7682088744" lon="-123.4533504490">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7688765768" lon="-123.4543193132">
+            <time>2026-06-26T00:15:03Z</time>
+            <name>0031</name>
+            <sym>Waypoint</sym>
+            <extensions>
+                <uuidx:uuid>ff871175-bd7c-4a8c-9dc1-ac3263226dd2</uuidx:uuid>
+            </extensions>
+        </rtept>
+        <rtept lat="48.7695287727" lon="-123.4559643455">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+        <rtept lat="48.7698383164" lon="-123.4566000290">
+            <time>2026-06-26T00:42:38Z</time>
+            <sym>Waypoint</sym>
+        </rtept>
+    </rte>
+    </gpx>
