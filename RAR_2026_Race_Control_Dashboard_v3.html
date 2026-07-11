@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RAR 2026 — Race Control Dashboard</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f172a;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* TOP BAR */
+#topbar{background:#1e293b;border-bottom:1px solid #334155;padding:9px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+#topbar h1{font-size:15px;font-weight:700;color:#f8fafc;letter-spacing:.04em;white-space:nowrap}
+.chip{background:#0f172a;border:1px solid #334155;border-radius:6px;padding:4px 10px;font-size:11px;white-space:nowrap}
+.chip span{color:#64748b}
+.chip strong{color:#f1f5f9}
+#clock{margin-left:auto;font-size:14px;font-weight:700;color:#38bdf8;font-variant-numeric:tabular-nums;white-space:nowrap}
+.demo-badge{background:#312e81;color:#a5b4fc;border:1px solid #4338ca;border-radius:4px;font-size:10px;padding:3px 8px;font-weight:600}
+
+/* LAYOUT */
+#main{display:flex;flex:1;overflow:hidden}
+#map{flex:1;min-width:0}
+
+/* SIDEBAR */
+#sidebar{width:370px;background:#1e293b;border-left:1px solid #334155;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column}
+#sidebar::-webkit-scrollbar{width:3px}
+#sidebar::-webkit-scrollbar-thumb{background:#475569;border-radius:2px}
+
+.sec-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#475569;padding:10px 12px 5px}
+
+/* ALERT BAR */
+#alert-bar{display:none;background:#450a0a;border:1px solid #ef4444;border-radius:6px;margin:8px 10px;padding:9px 12px;font-size:12px}
+#alert-bar strong{color:#fca5a5}
+#alert-bar p{color:#fecaca;margin-top:3px;font-size:11px}
+.blink{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:6px;animation:blink .7s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* FIELD STATS STRIP */
+#stats-strip{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 10px 8px}
+.stat-box{background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 10px}
+.stat-box .lbl{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.08em}
+.stat-box .val{font-size:18px;font-weight:700;color:#f1f5f9;margin-top:2px}
+.stat-box .unit{font-size:11px;color:#94a3b8;font-weight:400}
+
+/* QUARTILE CARDS */
+.q-card{border-left:3px solid;margin:6px 10px;border-radius:8px;background:#0f172a;overflow:hidden}
+.q-header{padding:9px 12px;display:flex;align-items:center;gap:8px}
+.q-label{font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:.07em}
+.q-boat-name{font-size:11px;margin-left:auto;font-weight:600}
+.q-ais{font-size:10px;color:#475569;margin-top:1px;text-align:right}
+.crew-list{padding:0 10px 8px}
+.crew-row{display:flex;align-items:center;gap:6px;padding:4px 0;border-top:1px solid #1e293b;font-size:11.5px}
+.rank{width:18px;color:#475569;font-weight:700;text-align:right;flex-shrink:0}
+.cname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.csog{color:#94a3b8;font-variant-numeric:tabular-nums;width:55px;text-align:right;flex-shrink:0;font-size:11px}
+.cdist{color:#475569;width:42px;text-align:right;flex-shrink:0;font-size:10px}
+.warn{color:#fbbf24}
+.sos{color:#ef4444;font-weight:700}
+
+/* RADIO SCRIPT */
+.radio{background:#0c1526;border:1px solid #1e3a5f;border-radius:6px;margin:4px 10px 10px;padding:9px 10px;font-size:10.5px;color:#93c5fd;font-family:'Courier New',monospace;line-height:1.6}
+.radio-label{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#1e40af;margin-bottom:4px}
+
+/* BOTTOM BAR */
+#bottombar{background:#1e293b;border-top:1px solid #334155;padding:9px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+button{padding:7px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:700;transition:all .15s;letter-spacing:.02em}
+button:hover{filter:brightness(1.1)}
+button:disabled{opacity:.5;cursor:default;filter:none}
+#btn-advance{background:#22c55e;color:#fff}
+#btn-sos{background:#ef4444;color:#fff}
+#btn-coverage{background:#334155;color:#e2e8f0}
+#btn-reset{background:#475569;color:#e2e8f0}
+#btn-yb{background:#7c3aed;color:#fff}
+#sim-note{margin-left:auto;font-size:10px;color:#475569}
+
+/* MAP MARKERS */
+.cm{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;border:2px solid rgba(255,255,255,.4);cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.6)}
+.cm.alert-pulse{animation:apulse .7s infinite}
+@keyframes apulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.8)}50%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
+.bm{width:34px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;border:2px solid;box-shadow:0 2px 8px rgba(0,0,0,.7);background:#1e293b}
+.start-flag{background:#f8fafc;color:#0f172a;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:800;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.sar-marker{background:#0ea5e9;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:800;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.6);border:1px solid #38bdf8}
+
+/* MARINE TRAFFIC PANEL */
+#ais-panel{display:none;position:fixed;inset:0;z-index:3000;background:#0f172a;flex-direction:column}
+#ais-panel.open{display:flex}
+#ais-header{background:#1e293b;border-bottom:1px solid #334155;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+#ais-header h2{font-size:14px;font-weight:700;color:#f8fafc}
+#ais-header p{font-size:11px;color:#64748b}
+#ais-frame{flex:1;border:none;width:100%}
+#btn-ais{background:#334155;color:#e2e8f0}
+#btn-mt{background:#0ea5e9;color:#fff}
+
+/* LIVE YB TEST PANEL */
+#yb-panel{display:none;position:fixed;top:56px;right:16px;width:320px;max-height:75vh;overflow-y:auto;background:#1e293b;border:1px solid #334155;border-radius:8px;z-index:2500;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#yb-panel.open{display:block}
+#yb-panel-header{padding:10px 12px;border-bottom:1px solid #334155;display:flex;align-items:center;gap:8px}
+#yb-panel-header h3{font-size:12px;font-weight:700;color:#f8fafc}
+#yb-panel-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+#yb-race-key{background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:6px 8px;font-size:12px;width:100%}
+#yb-status{background:#0c1526;border:1px solid #1e3a5f;border-radius:6px;padding:8px;font-size:10.5px;color:#93c5fd;font-family:'Courier New',monospace;white-space:pre-wrap;max-height:260px;overflow-y:auto}
+.yb-btn-row{display:flex;gap:6px}
+.yb-btn-row button{flex:1;font-size:11px;padding:6px 8px}
+.yb-hint{font-size:10.5px;color:#94a3b8;line-height:1.4}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <h1>🚣 RAR 2026 — Race Control Safety Dashboard</h1>
+  <span class="demo-badge">DEMO</span>
+  <div class="chip"><span>Spread </span><strong id="s-spread">—</strong></div>
+  <div class="chip"><span>Leader </span><strong id="s-leader">—</strong></div>
+  <div class="chip"><span>Sweeper </span><strong id="s-sweep">—</strong></div>
+  <div class="chip"><span>Max response </span><strong id="s-resp">—</strong></div>
+  <div id="clock">T + 4:30:00</div>
+</div>
+
+<div id="main">
+  <div id="map"></div>
+
+  <div id="sidebar">
+    <div id="alert-bar">
+      <div><span class="blink"></span><strong>⚠ SOS ALERT RECEIVED</strong></div>
+      <p id="alert-detail">—</p>
+    </div>
+
+    <div class="sec-title">Field Status</div>
+    <div id="stats-strip">
+      <div class="stat-box"><div class="lbl">Field Spread</div><div class="val" id="v-spread">—</div></div>
+      <div class="stat-box"><div class="lbl">Max Resp. Time</div><div class="val" id="v-resp">—</div></div>
+      <div class="stat-box"><div class="lbl">Leader</div><div class="val" id="v-leader">—</div></div>
+      <div class="stat-box"><div class="lbl">Sweeper Pace</div><div class="val" id="v-sweep">—</div></div>
+    </div>
+
+    <div class="sec-title">Quartile Assignments &amp; Radio Scripts</div>
+    <div id="qcards"></div>
+  </div>
+</div>
+
+<div id="bottombar">
+  <button id="btn-advance" onclick="advance()">⏩ Advance +15 min</button>
+  <button id="btn-sos" onclick="doSOS()">🚨 Simulate SOS</button>
+  <button id="btn-coverage" onclick="toggleCov()">⭕ Coverage Zones</button>
+  <button id="btn-reset" onclick="reset()">↺ Reset</button>
+  <button id="btn-ais" onclick="toggleAIS()">⛴ AIS Traffic</button>
+  <button id="btn-mt" onclick="openAIS()">🌐 MarineTraffic</button>
+  <button id="btn-yb" onclick="toggleYBPanel()">📡 Live YB Test</button>
+  <span id="sim-note">YB fleet data simulated · AIS traffic from sample data · Live YB fetch available →</span>
+</div>
+
+<!-- MARINE TRAFFIC FULL-SCREEN PANEL -->
+<div id="ais-panel">
+  <div id="ais-header">
+    <div>
+      <h2>🌐 Live AIS — Gulf Islands / Salt Spring Island</h2>
+      <p>MarineTraffic · Real-time vessel positions including BC Ferries (Fulford, Vesuvius, Long Harbour) and all commercial traffic</p>
+    </div>
+    <button onclick="closeAIS()" style="margin-left:auto;background:#334155;color:#e2e8f0;padding:7px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:700">✕ Close</button>
+  </div>
+  <iframe id="ais-frame" src="" allowfullscreen></iframe>
+</div>
+
+<!-- LIVE YB DATA TEST PANEL -->
+<div id="yb-panel">
+  <div id="yb-panel-header">
+    <h3>📡 Live YB Data — Test Fetch</h3>
+    <button onclick="toggleYBPanel()" style="margin-left:auto;background:#334155;color:#e2e8f0;padding:4px 8px;border-radius:6px;border:none;cursor:pointer;font-size:11px">✕</button>
+  </div>
+  <div id="yb-panel-body">
+    <div class="yb-hint">Fetches real tracker data straight from yb.tl and plots it on the map. This isn't the RAR course — it proves the fetch/decode pipeline works end to end against a real public race before RAR's own trackers are live.</div>
+    <input id="yb-race-key" value="bayviewmack2024" placeholder="YB race key"/>
+    <div class="yb-btn-row">
+      <button id="btn-yb-load" onclick="loadLiveRace()" style="background:#7c3aed;color:#fff">Load Race</button>
+      <button onclick="backToRARView()" style="background:#334155;color:#e2e8f0">Back to RAR View</button>
+    </div>
+    <div id="yb-status">Idle. Enter a YB race key and click Load Race.
+(Try bayviewmack2024 — the API doc's own worked example.)</div>
+  </div>
+</div>
+
+<script>
+/*
+ * Yellow Brick (YB) Tracking client — vanilla JS port of src/yb_binary_decoder.py
+ * and src/yb_race_data.py, for use directly in the browser (no build step).
+ *
+ * Same format assumptions as the Python decoder (see YELLOW_BRICK_API.md):
+ * absolute moment optional fields (alt/dtf/lap/pc) are int32; compressed/
+ * delta optional fields are int16, except lap which is a plain uint8.
+ * Verified against real data for bayviewmack2024 (DTF-only, flag 0x02) —
+ * other flag combinations are unverified.
+ */
+(function (global) {
+  'use strict';
+
+  const FLAG_ALT = 0x01;
+  const FLAG_DTF = 0x02;
+  const FLAG_LAP = 0x04;
+  const FLAG_PC = 0x08;
+  const COORD_SCALE = 100000.0;
+  const DTF_SCALE = 1000.0;
+
+  class Cursor {
+    constructor(buf) {
+      this.dv = new DataView(buf);
+      this.pos = 0;
+    }
+    remaining() { return this.dv.byteLength - this.pos; }
+    u8() { const v = this.dv.getUint8(this.pos); this.pos += 1; return v; }
+    u16() { const v = this.dv.getUint16(this.pos, false); this.pos += 2; return v; }
+    i16() { const v = this.dv.getInt16(this.pos, false); this.pos += 2; return v; }
+    u32() { const v = this.dv.getUint32(this.pos, false); this.pos += 4; return v; }
+    i32() { const v = this.dv.getInt32(this.pos, false); this.pos += 4; return v; }
+    peekU8() { return this.dv.getUint8(this.pos); }
+  }
+
+  function decodePositions(arrayBuffer) {
+    const cur = new Cursor(arrayBuffer);
+    if (cur.remaining() < 5) return [];
+
+    const flags = cur.u8();
+    const baseTimestamp = cur.u32();
+    const hasAlt = !!(flags & FLAG_ALT);
+    const hasDtf = !!(flags & FLAG_DTF);
+    const hasLap = !!(flags & FLAG_LAP);
+    const hasPc = !!(flags & FLAG_PC);
+
+    const trackers = [];
+
+    while (cur.remaining() >= 4) {
+      const teamId = cur.u16();
+      const numPositions = cur.u16();
+      const moments = [];
+      let prev = null;
+
+      for (let i = 0; i < numPositions; i++) {
+        if (cur.remaining() < 2) break;
+
+        const firstByte = cur.peekU8();
+        const compressed = !!(firstByte & 0x80);
+        let m;
+
+        if (compressed) {
+          const timeWord = cur.u16();
+          const deltaSeconds = timeWord & 0x7fff;
+          const dlat = cur.i16();
+          const dlon = cur.i16();
+
+          let alt = null, dtf = null, lap = null, pc = null;
+          if (hasAlt) alt = (prev && prev.alt != null ? prev.alt : 0) + cur.i16();
+          if (hasDtf) dtf = (prev && prev.dtf != null ? prev.dtf : 0) + cur.i16();
+          if (hasLap) lap = cur.u8();
+          if (hasPc) pc = (prev && prev.pc != null ? prev.pc : 0) + cur.i16();
+
+          if (prev == null) continue;
+
+          m = {
+            at: prev.at - deltaSeconds,
+            lat: prev.lat + dlat / COORD_SCALE,
+            lon: prev.lon + dlon / COORD_SCALE,
+            alt, dtf, lap, pc,
+          };
+        } else {
+          const offset = cur.u32();
+          const latRaw = cur.i32();
+          const lonRaw = cur.i32();
+
+          let alt = null, dtf = null, lap = null, pc = null;
+          if (hasAlt) alt = cur.i32();
+          if (hasDtf) dtf = cur.i32();
+          if (hasLap) lap = cur.u8();
+          if (hasPc) pc = cur.i32();
+
+          m = {
+            at: baseTimestamp + offset,
+            lat: latRaw / COORD_SCALE,
+            lon: lonRaw / COORD_SCALE,
+            alt, dtf, lap, pc,
+          };
+        }
+
+        moments.push(m);
+        prev = m;
+      }
+
+      trackers.push({ id: teamId, moments });
+    }
+
+    return trackers;
+  }
+
+  function toFloat(v) {
+    if (v === null || v === undefined) return null;
+    const f = parseFloat(v);
+    return Number.isNaN(f) ? null : f;
+  }
+
+  function decodeJsonBytes(buf) {
+    try {
+      return JSON.parse(new TextDecoder('utf-8').decode(buf));
+    } catch (e) {
+      return JSON.parse(new TextDecoder('latin1').decode(buf));
+    }
+  }
+
+  async function fetchWithRetry(url, { asJson = false, maxRetries = 5, timeoutMs = 60000 } = {}) {
+    let delay = 1000;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+      try {
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), timeoutMs);
+        const resp = await fetch(url, { signal: controller.signal });
+        clearTimeout(t);
+        if (resp.ok) {
+          return asJson ? decodeJsonBytes(await resp.arrayBuffer()) : await resp.arrayBuffer();
+        }
+        if (resp.status >= 400 && resp.status < 500) {
+          throw new Error(`HTTP ${resp.status} for ${url}`);
+        }
+        lastErr = new Error(`HTTP ${resp.status}`);
+      } catch (e) {
+        lastErr = e;
+      }
+      if (attempt <= maxRetries) {
+        const jitter = delay * (Math.random() * 0.5 - 0.25);
+        await new Promise((r) => setTimeout(r, Math.max(100, delay + jitter)));
+        delay *= 2;
+      }
+    }
+    throw new Error(`Failed after retries: ${url} (${lastErr})`);
+  }
+
+  async function loadRace(raceKey, { server = 'yb.tl' } = {}) {
+    const setupUrl = `https://${server}/JSON/${raceKey}/RaceSetup`;
+    const positionsUrl = `https://${server}/BIN/${raceKey}/AllPositions3`;
+
+    const [setup, rawPositions] = await Promise.all([
+      fetchWithRetry(setupUrl, { asJson: true }),
+      fetchWithRetry(positionsUrl, { asJson: false }),
+    ]);
+
+    const trackers = decodePositions(rawPositions);
+    const positionsById = new Map(trackers.map((t) => [t.id, t.moments]));
+    const tagsById = new Map((setup.tags || []).map((t) => [t.id, t]));
+
+    const boats = (setup.teams || []).map((team) => {
+      const classNames = (team.tags || [])
+        .map((id) => tagsById.get(id))
+        .filter(Boolean)
+        .map((t) => t.name);
+
+      const moments = positionsById.get(team.id) || [];
+      const positions = moments
+        .map((m) => ({
+          timestamp: m.at,
+          lat: m.lat,
+          lon: m.lon,
+          dtf: m.dtf != null ? m.dtf / DTF_SCALE : null,
+          alt: m.alt,
+          lap: m.lap,
+          pc: m.pc,
+        }))
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+      return {
+        id: team.id,
+        name: team.name || `id=${team.id}`,
+        sail: team.sail,
+        model: team.model,
+        status: team.status,
+        classNames,
+        start: team.start,
+        started: team.started,
+        finishedAt: team.finishedAt ?? null,
+        tcf1: toFloat(team.tcf1),
+        tcf2: toFloat(team.tcf2),
+        tcf3: toFloat(team.tcf3),
+        positions,
+        get isFinished() { return this.finishedAt != null; },
+        latest() { return this.positions.length ? this.positions[this.positions.length - 1] : null; },
+      };
+    });
+
+    const course = setup.course || {};
+    const info = {
+      raceKey,
+      title: (setup.pro && setup.pro.name) || setup.title || raceKey,
+      start: setup.start,
+      stop: setup.stop,
+      tz: setup.tz || 'UTC',
+      tzOffset: setup.tzOffset || 0,
+      viewerMode: setup.viewerMode,
+      distanceNm: course.distance,
+      courseNodes: course.nodes || [],
+    };
+
+    return { info, boats };
+  }
+
+  global.YB = { loadRace, decodePositions };
+})(window);
+
+// ── COURSE ROUTE (from RAR.GPX) ─────────────────────────────
+const ROUTE=[
+  [48.7696,-123.4570],[48.7691,-123.4565],[48.7681,-123.4552],[48.7661,-123.4534],
+  [48.7609,-123.4469],[48.7559,-123.4421],[48.7497,-123.4333],[48.7443,-123.4302],
+  [48.7378,-123.4245],[48.7325,-123.4231],[48.7289,-123.4276],[48.7157,-123.4584],
+  [48.7111,-123.4772],[48.7102,-123.4984],[48.7211,-123.5109],[48.7345,-123.5341],
+  [48.7443,-123.5545],[48.7579,-123.5629],[48.7695,-123.5672],[48.7766,-123.5557],
+  [48.7860,-123.5527],[48.7942,-123.5534],[48.7952,-123.5373],[48.7912,-123.5227],
+  [48.8059,-123.5504],[48.8123,-123.5603],[48.8149,-123.5706],[48.8216,-123.5777],
+  [48.8323,-123.5770],[48.8441,-123.5751],[48.8557,-123.5699],[48.8660,-123.5761],
+  [48.8740,-123.5821],[48.8836,-123.5837],[48.8909,-123.5901],[48.8995,-123.5962],
+  [48.9087,-123.5974],[48.9194,-123.5981],[48.9294,-123.6018],[48.9393,-123.6025],
+  [48.9489,-123.5970],[48.9440,-123.5802],[48.9353,-123.5648],[48.9279,-123.5493],
+  [48.9229,-123.5430],[48.9181,-123.5234],[48.9042,-123.5032],[48.8865,-123.4755],
+  [48.8762,-123.4549],[48.8621,-123.4304],[48.8415,-123.4160],[48.8367,-123.4311],
+  [48.8420,-123.4378],[48.8502,-123.4475],[48.8439,-123.4419],[48.8256,-123.4387],
+  [48.8123,-123.4221],[48.8025,-123.4099],[48.7998,-123.3938],[48.7963,-123.3891],
+  [48.7880,-123.3778],[48.7813,-123.3717],[48.7750,-123.3633],[48.7655,-123.3695],
+  [48.7539,-123.3811],[48.7525,-123.3932],[48.7531,-123.4174],[48.7549,-123.4338],
+  [48.7622,-123.4434],[48.7676,-123.4520],[48.7682,-123.4534],[48.7689,-123.4543],
+  [48.7695,-123.4560],[48.7698,-123.4566]
+];
+
+// ── SAMPLE CREW DATA (YB trackers) ──────────────────────────
+const SEED=[
+  {id:1, name:"UVic Vikes",          sog:11.4, prog:0.875},
+  {id:2, name:"False Creek RC",       sog:10.8, prog:0.851},
+  {id:3, name:"Victoria City RC",     sog:10.6, prog:0.833},
+  {id:4, name:"Vancouver RC",         sog:10.4, prog:0.816},
+  {id:5, name:"Seattle Coastal",      sog:10.2, prog:0.799},
+  {id:6, name:"Burrard Bridge RC",    sog:10.0, prog:0.778},
+  {id:7, name:"Port Moody RC",        sog: 9.8, prog:0.761},
+  {id:8, name:"Gulf Islands RC",      sog: 9.6, prog:0.743},
+  {id:9, name:"Nanaimo RC",           sog: 9.4, prog:0.724},
+  {id:10,name:"Kelowna RC",           sog: 9.2, prog:0.706},
+  {id:11,name:"Cowichan RC",          sog: 9.0, prog:0.685},
+  {id:12,name:"Tsawwassen RC",        sog: 8.9, prog:0.666},
+  {id:13,name:"Kitsilano RC",         sog: 8.7, prog:0.648},
+  {id:14,name:"Burnaby Lake RC",      sog: 8.6, prog:0.629},
+  {id:15,name:"New Westminster RC",   sog: 8.4, prog:0.611},
+  {id:16,name:"White Rock Coastal",   sog: 8.2, prog:0.590},
+  {id:17,name:"Delta RC",             sog: 8.1, prog:0.571},
+  {id:18,name:"Chilliwack RC",        sog: 8.0, prog:0.553},
+  {id:19,name:"Salt Spring Coastal",  sog: 7.9, prog:0.564},
+  {id:20,name:"Whistler RC",          sog: 7.8, prog:0.544},
+];
+
+const Q_COLORS=['#22c55e','#3b82f6','#f59e0b','#ef4444'];
+const Q_NAMES=['Q1 — Leading','Q2 — Mid-Front','Q3 — Mid-Rear','Q4 — Sweep'];
+const Q_BOATS=[
+  {label:'Boat 4 — Lead',     mmsi:'316-071-237'},
+  {label:'Boat 3 — Mid-Front',mmsi:'316-071-236'},
+  {label:'Boat 2 — Mid-Rear', mmsi:'316-071-235'},
+  {label:'Boat 1 — Sweep',    mmsi:'316-071-234'},
+];
+
+// ── STATE ────────────────────────────────────────────────────
+let secs=4*3600+30*60;
+let crews=SEED.map(c=>({...c}));
+let sosActive=false, sosId=14;
+let showCov=false;
+let covLayers=[];
+
+// ── ROUTE MATH ───────────────────────────────────────────────
+function hav([a,b],[c,d]){
+  const R=6371,r=Math.PI/180;
+  const da=(c-a)*r,db=(d-b)*r;
+  const x=Math.sin(da/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(db/2)**2;
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+const RDIST=(()=>{const d=[0];for(let i=1;i<ROUTE.length;i++)d.push(d[i-1]+hav(ROUTE[i-1],ROUTE[i]));return d})();
+const TOTAL=RDIST[RDIST.length-1];
+
+function p2ll(p){
+  const t=Math.min(Math.max(p,0),1)*TOTAL;
+  for(let i=1;i<RDIST.length;i++){
+    if(RDIST[i]>=t){
+      const f=(t-RDIST[i-1])/(RDIST[i]-RDIST[i-1]);
+      return[ROUTE[i-1][0]+f*(ROUTE[i][0]-ROUTE[i-1][0]),
+             ROUTE[i-1][1]+f*(ROUTE[i][1]-ROUTE[i-1][1])];
+    }
+  }
+  return ROUTE[ROUTE.length-1];
+}
+
+function quartiles(){
+  const s=[...crews].sort((a,b)=>b.prog-a.prog);
+  const q=Math.ceil(s.length/4);
+  let r=1;
+  const qs=[s.slice(0,q),s.slice(q,2*q),s.slice(2*q,3*q),s.slice(3*q)];
+  qs.forEach(g=>g.forEach(c=>c.rank=r++));
+  return qs;
+}
+
+function midPos(qc){
+  const ps=qc.map(c=>c.prog);
+  return p2ll((Math.max(...ps)+Math.min(...ps))/2);
+}
+
+// ── MAP ──────────────────────────────────────────────────────
+const RAR_VIEW = {center:[48.84,-123.50], zoom:11};
+const map=L.map('map',{center:RAR_VIEW.center,zoom:RAR_VIEW.zoom});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:19
+}).addTo(map);
+
+L.polyline(ROUTE,{color:'#94a3b8',weight:2.5,opacity:0.5,dashArray:'6,5'}).addTo(map);
+
+const startIcon=L.divIcon({className:'',html:'<div class="start-flag">⚑ START / FINISH</div>',iconAnchor:[50,10]});
+L.marker(ROUTE[0],{icon:startIcon}).addTo(map).bindPopup('<b>Fulford Harbour</b><br/>Race Start / Finish');
+
+// ── SURGE RESCUE CAPACITY (static) ──────────────────────────
+const sarIcon1=L.divIcon({className:'',html:'<div class="sar-marker">⚓ Vesuvius SAR</div>',iconAnchor:[52,10]});
+L.marker([48.8748,-123.5807],{icon:sarIcon1,zIndexOffset:500}).addTo(map)
+  .bindPopup('<b>Vesuvius Bay — Surge Rescue</b><br/>BC Marine Search &amp; Rescue<br/><i>Crofton ferry corridor</i><br/><br/>📻 Mayday: VHF Channel 16<br/>📞 1-800-567-5111');
+
+const sarIcon2=L.divIcon({className:'',html:'<div class="sar-marker">⚓ Trincomali Staging</div>',iconAnchor:[68,10]});
+L.marker([48.8950,-123.3820],{icon:sarIcon2,zIndexOffset:500}).addTo(map)
+  .bindPopup('<b>Trincomali Channel — Surge Staging</b><br/>Surge rescue capacity<br/><i>Between Salt Spring &amp; Galiano Islands</i>');
+
+let cMarkers=[],bMarkers=[];
+
+// ── RENDER ───────────────────────────────────────────────────
+function render(){
+  [...cMarkers,...bMarkers].forEach(m=>map.removeLayer(m));
+  cMarkers=[];bMarkers=[];
+  covLayers.forEach(l=>map.removeLayer(l));
+  covLayers=[];
+
+  const qs=quartiles();
+  const all=qs.flat();
+  const leader=all[0], sweeper=all[all.length-1];
+  const spread=(leader.prog-sweeper.prog)*TOTAL;
+  const halfQ=spread/8;
+  const respMin=halfQ/60*60;
+
+  // topbar
+  document.getElementById('s-spread').textContent=spread.toFixed(1)+' km';
+  document.getElementById('s-leader').textContent=(leader.prog*TOTAL).toFixed(1)+' km';
+  document.getElementById('s-sweep').textContent=sweeper.sog.toFixed(1)+' km/h';
+  document.getElementById('s-resp').textContent=respMin.toFixed(1)+' min';
+  document.getElementById('v-spread').innerHTML=spread.toFixed(1)+'<span class="unit"> km</span>';
+  document.getElementById('v-resp').innerHTML=respMin.toFixed(1)+'<span class="unit"> min</span>';
+  document.getElementById('v-leader').innerHTML=(leader.prog*TOTAL).toFixed(1)+'<span class="unit"> km</span>';
+  document.getElementById('v-sweep').innerHTML=sweeper.sog.toFixed(1)+'<span class="unit"> km/h</span>';
+
+  // clock
+  const h=Math.floor(secs/3600),m=Math.floor((secs%3600)/60),s=secs%60;
+  document.getElementById('clock').textContent=`T + ${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+
+  // crew + safety boat markers
+  qs.forEach((qc,qi)=>{
+    const col=Q_COLORS[qi];
+
+    // crew markers
+    qc.forEach(c=>{
+      const pos=p2ll(c.prog);
+      const isSOS=sosActive&&c.id===sosId;
+      const icon=L.divIcon({className:'',
+        html:`<div class="cm${isSOS?' alert-pulse':''}" style="background:${isSOS?'#ef4444':col}">${c.rank}</div>`,
+        iconSize:[26,26],iconAnchor:[13,13]});
+      const m=L.marker(pos,{icon}).addTo(map)
+        .bindTooltip(`<b>${c.name}</b><br/>Rank #${c.rank}  •  ${c.sog.toFixed(1)} km/h<br/>${((1-c.prog)*TOTAL).toFixed(1)} km to finish${isSOS?'<br/><b style="color:#ef4444">⚠ SOS ACTIVE</b>':''}`,
+          {direction:'top',offset:[0,-14],opacity:.95});
+      cMarkers.push(m);
+    });
+
+    // safety boat marker (AIS) — offset slightly off course line
+    const bp=midPos(qc);
+    const off=[bp[0]+0.005,bp[1]+0.004];
+    const boat=Q_BOATS[qi];
+    const bicon=L.divIcon({className:'',
+      html:`<div class="bm" style="color:${col};border-color:${col};">${boat.label.split(' ')[1]}</div>`,
+      iconSize:[34,22],iconAnchor:[17,11]});
+    const bm=L.marker(off,{icon:bicon,zIndexOffset:1000}).addTo(map)
+      .bindTooltip(`<b>${boat.label}</b><br/>AIS · MMSI ${boat.mmsi}<br/>Monitoring ${qc.length} vessels`,
+        {direction:'top',offset:[0,-12],opacity:.95});
+    bMarkers.push(bm);
+
+    // coverage circle
+    if(showCov){
+      const cl=L.circle(off,{radius:3600,color:col,fillColor:col,fillOpacity:.07,weight:1.5,dashArray:'5,4'}).addTo(map);
+      covLayers.push(cl);
+    }
+  });
+
+  // SOS alert bar
+  if(sosActive){
+    const c=crews.find(x=>x.id===sosId);
+    const pos=p2ll(c.prog);
+    document.getElementById('alert-bar').style.display='block';
+    document.getElementById('alert-detail').textContent=
+      `${c.name}  •  ${pos[0].toFixed(4)}°N ${Math.abs(pos[1]).toFixed(4)}°W  •  Nearest launch responding`;
+  } else {
+    document.getElementById('alert-bar').style.display='none';
+  }
+
+  renderSidebar(qs);
+}
+
+// ── SIDEBAR ──────────────────────────────────────────────────
+function renderSidebar(qs){
+  const html=qs.map((qc,qi)=>{
+    const col=Q_COLORS[qi];
+    const boat=Q_BOATS[qi];
+    const ps=qc.map(c=>c.prog);
+    const span=(Math.max(...ps)-Math.min(...ps))*TOTAL;
+
+    const rows=qc.map(c=>{
+      const isSOS=sosActive&&c.id===sosId;
+      const isWarn=c.sog<8.2&&!isSOS;
+      return `<div class="crew-row">
+        <span class="rank">${c.rank}</span>
+        <span class="cname ${isSOS?'sos':isWarn?'warn':''}">${isSOS?'⚠ ':isWarn?'⚡ ':''}${c.name}</span>
+        <span class="csog">${c.sog.toFixed(1)} km/h</span>
+        <span class="cdist">${((1-c.prog)*TOTAL).toFixed(1)}km</span>
+      </div>`;
+    }).join('');
+
+    const lead=qc.reduce((a,b)=>a.prog>b.prog?a:b);
+    const trail=qc.reduce((a,b)=>a.prog<b.prog?a:b);
+    const script=`${boat.label.toUpperCase()}, RACE CONTROL — `+
+      `Quartile: ${qc.map(c=>c.name).join(' / ')}. `+
+      `Lead crew ${lead.name} at ${(lead.prog*TOTAL).toFixed(1)} km. `+
+      `Trail crew ${trail.name} at ${(trail.prog*TOTAL).toFixed(1)} km. `+
+      `Sector span ${span.toFixed(1)} km. Acknowledge.`;
+
+    return `<div class="q-card" style="border-color:${col}">
+      <div class="q-header">
+        <span class="q-label" style="background:${col}22;color:${col}">${Q_NAMES[qi]}</span>
+        <div style="margin-left:auto;text-align:right">
+          <div class="q-boat-name" style="color:${col}">${boat.label}</div>
+          <div class="q-ais">AIS · ${boat.mmsi}</div>
+        </div>
+      </div>
+      <div class="crew-list">${rows}</div>
+      <div class="radio">
+        <div class="radio-label">📻 Radio Script</div>
+        ${script}
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('qcards').innerHTML=html;
+}
+
+// ── CONTROLS ─────────────────────────────────────────────────
+function advance(){
+  secs+=15*60;
+  sosActive=false;
+  crews.forEach(c=>{
+    const km=c.sog*(15/60)*(0.92+Math.random()*.16);
+    c.prog=Math.min(1,c.prog+km/TOTAL);
+    c.sog=Math.max(7.5,c.sog+(Math.random()-.53)*.35);
+  });
+  render();
+}
+
+function doSOS(){
+  sosActive=true;
+  const c=crews.find(x=>x.id===sosId);
+  map.panTo(p2ll(c.prog));
+  render();
+}
+
+function toggleCov(){
+  showCov=!showCov;
+  document.getElementById('btn-coverage').style.background=showCov?'#1d4ed8':'#334155';
+  render();
+}
+
+function reset(){
+  secs=4*3600+30*60;
+  crews=SEED.map(c=>({...c}));
+  sosActive=false;showCov=false;
+  document.getElementById('btn-coverage').style.background='#334155';
+  render();
+  map.setView(RAR_VIEW.center,RAR_VIEW.zoom);
+}
+
+// ── AIS TRAFFIC LAYER (from API sample data) ─────────────────
+const AIS_VESSELS=[{"mmsi":"316003656","name":"CARRIER PRINCESS","lat":48.75979,"lon":-123.35711,"sog":13.5,"cog":42.7,"cat":"ferry","dest":"TILBURY"},{"mmsi":"316001268","name":"SPIRIT OF B.C.","lat":49.12353,"lon":-123.08503,"sog":0.1,"cog":224.0,"cat":"ferry","dest":"TSAWWASSEN<>SWARTZ"},{"mmsi":"316001235","name":"KLITSA","lat":48.57712,"lon":-123.46762,"sog":0.0,"cog":291.4,"cat":"ferry","dest":"BRENTWOOD-MILL BAY"},{"mmsi":"316001265","name":"Coastal Inspiration","lat":49.1252,"lon":-123.08587,"sog":0.0,"cog":45.0,"cat":"ferry","dest":""},{"mmsi":"316001252","name":"Queen of Cowichan","lat":48.68977,"lon":-123.40969,"sog":0.0,"cog":252.3,"cat":"ferry","dest":""},{"mmsi":"316001262","name":"QUEEN OF SURREY","lat":49.12445,"lon":-123.08403,"sog":0.0,"cog":61.0,"cat":"ferry","dest":"HORSESHOE<>LANGDALE"},{"mmsi":"316001269","name":"SPIRIT OF VI","lat":48.69037,"lon":-123.4128,"sog":0.0,"cog":1.0,"cat":"ferry","dest":"TSAWWASSEN<>SWARTZ"},{"mmsi":"316001267","name":"SKEENA QUEEN","lat":48.7695,"lon":-123.45187,"sog":0.0,"cog":0.2,"cat":"ferry","dest":"FULFORD<>SWARTZ"},{"mmsi":"316001238","name":"MAYNE QUEEN","lat":48.68872,"lon":-123.40941,"sog":0.0,"cog":318.7,"cat":"ferry","dest":"SOUTH GULF ISLANDS"},{"mmsi":"316001234","name":"Tsawwassen Spirit","lat":48.88132,"lon":-123.57383,"sog":0.0,"cog":133.0,"cat":"ferry","dest":""},{"mmsi":"316115000","name":"CCGS VECTOR","lat":48.65429,"lon":-123.4524,"sog":0.0,"cog":173.1,"cat":"coastguard","dest":""},{"mmsi":"316011982","name":"","lat":49.1087,"lon":-123.29347,"sog":23.5,"cog":235.6,"cat":"underway","dest":""},{"mmsi":"355530000","name":"EASTERN ASIA","lat":48.95844,"lon":-123.17789,"sog":15.0,"cog":312.7,"cat":"cargo","dest":"CA NNO"},{"mmsi":"249029000","name":"","lat":49.12054,"lon":-123.33801,"sog":14.5,"cog":5.2,"cat":"underway","dest":""},{"mmsi":"564185000","name":"HOEGH INCHON","lat":49.05842,"lon":-123.31677,"sog":14.0,"cog":316.2,"cat":"cargo","dest":"NEW WESTMINSTER"},{"mmsi":"316003289","name":"PRINCESS SUPERIOR","lat":48.69342,"lon":-123.37953,"sog":13.7,"cog":264.3,"cat":"cargo","dest":"SWARTZ BAY"},{"mmsi":"636091510","name":"","lat":48.85678,"lon":-123.03915,"sog":13.3,"cog":328.0,"cat":"underway","dest":""},{"mmsi":"316011773","name":"GRIZZLY 60","lat":48.85326,"lon":-123.3969,"sog":11.8,"cog":115.0,"cat":"military_law","dest":"ESQUIMALT"},{"mmsi":"316011515","name":"","lat":48.84992,"lon":-123.38649,"sog":11.8,"cog":116.6,"cat":"underway","dest":""},{"mmsi":"316003900","name":"","lat":49.13577,"lon":-123.48324,"sog":10.0,"cog":107.0,"cat":"underway","dest":""},{"mmsi":"316011116","name":"RENARD 58","lat":48.77983,"lon":-123.35495,"sog":9.8,"cog":194.1,"cat":"military_law","dest":"ESQUIMALT"},{"mmsi":"316005574","name":"","lat":49.04377,"lon":-123.30599,"sog":8.4,"cog":320.6,"cat":"underway","dest":""},{"mmsi":"316009418","name":"","lat":48.73444,"lon":-123.28348,"sog":7.8,"cog":308.7,"cat":"underway","dest":""},{"mmsi":"367128880","name":"ISLAND STAR","lat":49.1013,"lon":-123.48547,"sog":7.0,"cog":130.4,"cat":"fishing","dest":"SEATTLE"},{"mmsi":"316001349","name":"","lat":49.04897,"lon":-123.57667,"sog":6.4,"cog":353.4,"cat":"underway","dest":""},{"mmsi":"316007654","name":"","lat":49.13058,"lon":-123.22831,"sog":3.8,"cog":109.1,"cat":"other","dest":""},{"mmsi":"357811000","name":"","lat":48.81583,"lon":-123.25933,"sog":0.1,"cog":143.0,"cat":"other","dest":""},{"mmsi":"316001255","name":"","lat":49.00606,"lon":-123.12903,"sog":0.0,"cog":358.1,"cat":"other","dest":""},{"mmsi":"367361510","name":"ANITA","lat":48.67079,"lon":-123.40642,"sog":0.1,"cog":240.8,"cat":"other","dest":""},{"mmsi":"316004702","name":"PROSPERITY","lat":49.11787,"lon":-123.16291,"sog":0.0,"cog":290.1,"cat":"fishing","dest":""},{"mmsi":"316019447","name":"VIKING CAVALIER","lat":49.12316,"lon":-123.18191,"sog":0.0,"cog":306.6,"cat":"fishing","dest":""},{"mmsi":"316003661","name":"","lat":48.87597,"lon":-123.63922,"sog":0.0,"cog":79.0,"cat":"other","dest":""},{"mmsi":"316009547","name":"","lat":48.98024,"lon":-123.67889,"sog":0.0,"cog":279.1,"cat":"other","dest":""},{"mmsi":"316244000","name":"TRUE BLUE","lat":48.666,"lon":-123.40857,"sog":0.0,"cog":360.0,"cat":"other","dest":""},{"mmsi":"316006460","name":"","lat":48.74858,"lon":-123.62359,"sog":0.0,"cog":340.4,"cat":"other","dest":""},{"mmsi":"240722000","name":"MAERSK KURE","lat":49.01983,"lon":-123.15085,"sog":0.0,"cog":0.0,"cat":"cargo","dest":"VANCOUVER"}];
+
+let showAIS=false, aisMarkers=[];
+
+function toggleAIS(){
+  showAIS=!showAIS;
+  document.getElementById('btn-ais').style.background=showAIS?'#0369a1':'#334155';
+  if(showAIS){ renderAIS(); } else { aisMarkers.forEach(m=>map.removeLayer(m)); aisMarkers=[]; }
+}
+
+const COMMERCIAL=new Set(['ferry','coastguard','military_law','cargo']);
+
+function renderAIS(){
+  aisMarkers.forEach(m=>map.removeLayer(m)); aisMarkers=[];
+  const catStyle={
+    ferry:    {color:'#0ea5e9', size:[44,20], z:800},
+    coastguard:{color:'#f97316',size:[36,20], z:700},
+    military_law:{color:'#a855f7',size:[28,18],z:600},
+    cargo:    {color:'#94a3b8', size:[24,18], z:400},
+    fishing:  {color:'#84cc16', size:[22,16], z:400},
+    underway: {color:'#cbd5e1', size:[18,14], z:300},
+    other:    {color:'#475569', size:[16,14], z:200},
+  };
+  AIS_VESSELS.filter(v=>COMMERCIAL.has(v.cat)).forEach(v=>{
+    const s=catStyle[v.cat]||catStyle.other;
+    const label=v.name||(v.cat==='ferry'?'Ferry':'·');
+    const underway=v.sog>1;
+    const html=`<div style="background:${s.color};color:#fff;border-radius:3px;padding:1px 5px;font-size:9px;font-weight:800;white-space:nowrap;opacity:${underway?1:0.65};box-shadow:0 1px 4px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.25)">${label||'—'}</div>`;
+    const icon=L.divIcon({className:'',html,iconAnchor:[s.size[0]/2,s.size[1]/2]});
+    const tooltip=`<b>${v.name||'Unknown'}</b> <span style="color:#94a3b8">${v.mmsi}</span><br/>`+
+      `${v.cat.replace('_',' ')} · ${v.sog} kn · COG ${v.cog}°`+
+      (v.dest?`<br/>Dest: ${v.dest}`:'');
+    const m=L.marker([v.lat,v.lon],{icon,zIndexOffset:s.z})
+      .addTo(map).bindTooltip(tooltip,{direction:'top',opacity:.95});
+    aisMarkers.push(m);
+  });
+}
+
+// ── MARINE TRAFFIC ───────────────────────────────────────────
+function openAIS(){
+  // Centred on Salt Spring Island, zoom 12, dark map, all vessel types
+  document.getElementById('ais-frame').src=
+    'https://www.marinetraffic.com/en/ais/embed/zoom:12/centery:48.840/centerx:-123.500/maptype:4/shownames:true/mmsi:0/shipid:0/fleet:/fleet_id:/vtypes:/showmenu:false/remember:false';
+  document.getElementById('ais-panel').classList.add('open');
+}
+function closeAIS(){
+  document.getElementById('ais-panel').classList.remove('open');
+  document.getElementById('ais-frame').src=''; // stop loading when closed
+}
+
+// ── LIVE YB DATA TEST (fetches real tracker data from yb.tl) ──
+let ybMarkers=[];
+
+function toggleYBPanel(){
+  document.getElementById('yb-panel').classList.toggle('open');
+}
+
+function ybStatus(msg){
+  document.getElementById('yb-status').textContent = msg;
+}
+
+function clearYBMarkers(){
+  ybMarkers.forEach(m=>map.removeLayer(m));
+  ybMarkers=[];
+}
+
+function backToRARView(){
+  clearYBMarkers();
+  map.setView(RAR_VIEW.center, RAR_VIEW.zoom);
+  ybStatus('Idle. Enter a YB race key and click Load Race.\n(Try bayviewmack2024 — the API doc\'s own worked example.)');
+}
+
+async function loadLiveRace(){
+  const raceKey = document.getElementById('yb-race-key').value.trim();
+  if(!raceKey){ ybStatus('Enter a race key first.'); return; }
+  const btn = document.getElementById('btn-yb-load');
+  btn.disabled = true;
+  ybStatus(`Loading ${raceKey} from yb.tl ...\n(fetching RaceSetup + AllPositions3)`);
+  try{
+    const race = await YB.loadRace(raceKey);
+    clearYBMarkers();
+
+    const statusColor = s => s==='FINISHED' ? '#3b82f6' : s==='RACING' ? '#22c55e' : '#64748b';
+    const withPos = race.boats.filter(b=>b.positions.length>0);
+    const bounds = [];
+
+    withPos.forEach(b=>{
+      const p = b.latest();
+      if(!p) return;
+      bounds.push([p.lat, p.lon]);
+      const marker = L.circleMarker([p.lat, p.lon], {
+        radius:5, color:'#fff', weight:1, fillColor:statusColor(b.status), fillOpacity:0.9
+      }).addTo(map).bindTooltip(
+        `<b>${b.name}</b><br/>${b.status||'—'} · sail ${b.sail||'—'}<br/>`+
+        (p.dtf!=null?`DTF ${p.dtf.toFixed(1)} nm<br/>`:'')+
+        `${b.classNames.join(', ')||''}`,
+        {direction:'top', offset:[0,-6], opacity:.95}
+      );
+      ybMarkers.push(marker);
+    });
+
+    if(bounds.length){ map.fitBounds(bounds, {padding:[30,30]}); }
+
+    const sample = withPos[0];
+    const samplePos = sample ? sample.latest() : null;
+    ybStatus(
+      `${race.info.title} (${race.info.raceKey})\n`+
+      `Boats: ${race.boats.length}   With live positions: ${withPos.length}\n`+
+      `Distance: ${race.info.distanceNm ? race.info.distanceNm.toFixed(1)+' nm' : '—'}\n`+
+      (sample ? `Sample: ${sample.name} — ${sample.positions.length} fixes\n`+
+        `  latest: ${samplePos.lat.toFixed(5)}, ${samplePos.lon.toFixed(5)}`+
+        (samplePos.dtf!=null?`  DTF=${samplePos.dtf.toFixed(1)}nm`:'') : '')+
+      `\n\nPipeline confirmed working. Click "Back to RAR View" to return.`
+    );
+  }catch(e){
+    ybStatus(`ERROR: ${e.message}\n\nIf this is a CORS/network error, the browser blocked a direct request to yb.tl from this page — in that case we'd need a small proxy/backend rather than pure client-side fetch.`);
+    console.error(e);
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+render();
+</script>
+</body>
+</html>
