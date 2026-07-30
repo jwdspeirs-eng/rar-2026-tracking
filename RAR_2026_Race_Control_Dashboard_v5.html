@@ -771,6 +771,22 @@ function toggleAIS(){
 
 const COMMERCIAL=new Set(['ferry','coastguard','military_law','cargo']);
 
+// Predicted course vector: how far ahead to project each moving vessel.
+const AIS_VECTOR_MIN = 6;        // minutes of projected travel to draw
+const AIS_VECTOR_MIN_SOG = 0.5;  // only draw a vector for vessels moving faster than this (kn)
+
+// Destination point from lat/lon given a bearing (deg) and distance (nautical miles).
+function projectAhead(lat, lon, cogDeg, distNm){
+  const R = 3440.065;            // Earth radius in NM
+  const d = distNm / R;
+  const brng = cogDeg * Math.PI/180;
+  const p1 = lat * Math.PI/180, l1 = lon * Math.PI/180;
+  const p2 = Math.asin(Math.sin(p1)*Math.cos(d) + Math.cos(p1)*Math.sin(d)*Math.cos(brng));
+  const l2 = l1 + Math.atan2(Math.sin(brng)*Math.sin(d)*Math.cos(p1),
+                             Math.cos(d) - Math.sin(p1)*Math.sin(p2));
+  return [p2*180/Math.PI, l2*180/Math.PI];
+}
+
 function renderAIS(){
   aisMarkers.forEach(m=>map.removeLayer(m)); aisMarkers=[];
   const catStyle={
@@ -791,6 +807,13 @@ function renderAIS(){
     const tooltip=`<b>${v.name||'Unknown'}</b> <span style="color:#94a3b8">${v.mmsi}</span><br/>`+
       `${v.cat.replace('_',' ')} · ${v.sog} kn · COG ${v.cog}°`+
       (v.dest?`<br/>Dest: ${v.dest}`:'');
+    // predicted course vector — COG/SOG projected AIS_VECTOR_MIN minutes ahead
+    if(v.sog > AIS_VECTOR_MIN_SOG){
+      const end = projectAhead(v.lat, v.lon, v.cog, v.sog * (AIS_VECTOR_MIN/60));
+      aisMarkers.push(
+        L.polyline([[v.lat,v.lon], end], {color:s.color, weight:2, opacity:.85, dashArray:'4 3'}).addTo(map)
+      );
+    }
     const m=L.marker([v.lat,v.lon],{icon,zIndexOffset:s.z})
       .addTo(map).bindTooltip(tooltip,{direction:'top',opacity:.95});
     aisMarkers.push(m);
