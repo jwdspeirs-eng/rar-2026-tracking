@@ -813,6 +813,13 @@ function renderAIS(){
       aisMarkers.push(
         L.polyline([[v.lat,v.lon], end], {color:s.color, weight:2, opacity:.85, dashArray:'4 3'}).addTo(map)
       );
+      // arrowhead at the vector tip, rotated to the vessel's course (COG)
+      const arrow=L.divIcon({className:'',
+        html:`<div style="transform:rotate(${v.cog}deg);width:0;height:0;`+
+             `border-left:5px solid transparent;border-right:5px solid transparent;`+
+             `border-bottom:9px solid ${s.color};opacity:.9"></div>`,
+        iconSize:[10,9], iconAnchor:[5,5]});
+      aisMarkers.push(L.marker(end,{icon:arrow, zIndexOffset:s.z}).addTo(map));
     }
     const m=L.marker([v.lat,v.lon],{icon,zIndexOffset:s.z})
       .addTo(map).bindTooltip(tooltip,{direction:'top',opacity:.95});
