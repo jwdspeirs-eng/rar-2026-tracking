@@ -972,9 +972,10 @@ function renderAIS(){
     coastguard:{color:'#f97316',size:[36,20], z:700},
     military_law:{color:'#a855f7',size:[28,18],z:600},
     cargo:    {color:'#94a3b8', size:[24,18], z:400},
-    fishing:  {color:'#84cc16', size:[22,16], z:400},
-    underway: {color:'#cbd5e1', size:[18,14], z:300},
-    other:    {color:'#475569', size:[16,14], z:200},
+    // non-commercial: darker/saturated so the white label reads on the day map too
+    fishing:  {color:'#15803d', size:[22,16], z:400},   // green
+    underway: {color:'#0f766e', size:[18,14], z:300},   // teal
+    other:    {color:'#0f766e', size:[16,14], z:200},   // teal
   };
   const visible = aisMode==='all' ? AIS_VESSELS : AIS_VESSELS.filter(v=>COMMERCIAL.has(v.cat));
   visible.forEach(v=>{
