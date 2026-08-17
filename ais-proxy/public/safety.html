@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>RAR 2026 — Safety Boat</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:#0f172a;color:#e2e8f0;font-family:-apple-system,'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+#top{background:#1e293b;border-bottom:1px solid #334155;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+#top h1{font-size:15px;font-weight:800;letter-spacing:.02em;white-space:nowrap}
+#boat-sel{margin-left:2px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px 10px;font-size:14px;font-weight:700;flex:1;min-width:0}
+#pill{margin-left:auto;font-size:11px;font-weight:700;padding:5px 10px;border-radius:999px;white-space:nowrap;background:#064e3b;color:#6ee7b7;border:1px solid #059669}
+#pill.stale{background:#450a0a;color:#fca5a5;border-color:#ef4444}
+#pill.warn{background:#422006;color:#fcd34d;border-color:#d97706}
+#map{flex:1;min-height:0}
+#banner{display:none;background:#450a0a;border-top:1px solid #ef4444;color:#fecaca;font-size:13px;font-weight:700;padding:9px 12px;text-align:center;flex-shrink:0}
+#banner.show{display:block}
+#banner.amber{background:#422006;border-color:#d97706;color:#fde68a}
+#sheet{background:#1e293b;border-top:1px solid #334155;flex-shrink:0;max-height:44vh;overflow-y:auto;padding-bottom:env(safe-area-inset-bottom)}
+#sheet-head{position:sticky;top:0;background:#1e293b;padding:9px 12px 6px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#64748b;display:flex;align-items:center;gap:8px}
+#sheet-head .cnt{margin-left:auto;color:#94a3b8}
+.row{display:flex;align-items:center;gap:10px;padding:11px 12px;border-top:1px solid #0f172a}
+.rk{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0}
+.nm{flex:1;min-width:0;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nm .flags{font-size:12px}
+.met{text-align:right;flex-shrink:0;font-variant-numeric:tabular-nums}
+.met .big{font-size:14px;font-weight:700}
+.met .sub{font-size:10px;color:#94a3b8}
+.warn{color:#fbbf24}
+.sos{color:#f87171}
+.dim{opacity:.5}
+#empty{padding:18px 12px;color:#64748b;font-size:13px;text-align:center}
+/* markers */
+.me-dot{width:22px;height:22px;border-radius:50%;background:#38bdf8;border:3px solid #fff;box-shadow:0 0 0 4px rgba(56,189,248,.35);animation:mepulse 1.6s infinite}
+@keyframes mepulse{0%,100%{box-shadow:0 0 0 4px rgba(56,189,248,.35)}50%{box-shadow:0 0 0 10px rgba(56,189,248,0)}}
+.cmk{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;border:2px solid rgba(255,255,255,.5);box-shadow:0 2px 6px rgba(0,0,0,.6)}
+.cmk.off{border-color:#ef4444;animation:apulse .8s infinite}
+@keyframes apulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.8)}50%{box-shadow:0 0 0 9px rgba(239,68,68,0)}}
+.cmk.small{width:16px;height:16px;font-size:9px;opacity:.55}
+.start-flag{background:#f8fafc;color:#0f172a;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:800;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="top">
+  <h1>🚨 Safety</h1>
+  <select id="boat-sel" onchange="onBoatChange()"></select>
+  <span id="pill">connecting…</span>
+</div>
+<div id="banner"></div>
+<div id="map"></div>
+<div id="sheet">
+  <div id="sheet-head"><span id="sheet-title">Your crews</span><span class="cnt" id="sheet-cnt"></span></div>
+  <div id="rows"></div>
+  <div id="empty" style="display:none"></div>
+</div>
+
+<script>
+/* ============================================================
+ * RAR 2026 — Safety Boat View (stripped-down, phone/iPad)
+ * Shares the dashboard's YB decoder + course math so quartile
+ * assignment is identical. Own position comes from the device
+ * GPS (navigator.geolocation); crew positions come from the YB
+ * feed via the Vercel proxy.
+ *
+ * URL params:  ?race=RAR2026   (race key, default RAR2026)
+ *              ?boat=4          (1..4; which safety boat you are)
+ * ============================================================ */
+
+// ---- shared config (KEEP IN SYNC with the dashboard) ----
+const YB_PROXY_BASE = 'https://jwds.vercel.app/api/yb';
+const TRACKER_ID_MAP = {
+  // <YB team id>: "Crew name"
+};
+const SAFETY_BOAT_IDS = {
+  // <YB team id>: {label:"Boat 1 — Lead", mmsi:"..."},
+};
+
+const Q_COLORS=['#22c55e','#3b82f6','#f59e0b','#ef4444'];
+// Boat 1 covers Q1 (leaders) … Boat 4 covers Q4 (sweep). index = quartile index.
+const BOATS=[
+  {n:1, label:'Boat 1 — Lead',      q:0},
+  {n:2, label:'Boat 2 — Mid-Front', q:1},
+  {n:3, label:'Boat 3 — Mid-Rear',  q:2},
+  {n:4, label:'Boat 4 — Sweep',     q:3},
+];
+const OFF_COURSE_KM = 1.5;
+const OFF_PACE_KMH  = 7.5;
+const POLL_MS = 60000;
+const STALE_MS = 150000;
+
+// ---- decoder (from dashboard) ----
+/*
+ * Yellow Brick (YB) Tracking client — vanilla JS port of src/yb_binary_decoder.py
+ * and src/yb_race_data.py, for use directly in the browser (no build step).
+ *
+ * Same format assumptions as the Python decoder (see YELLOW_BRICK_API.md):
+ * absolute moment optional fields (alt/dtf/lap/pc) are int32; compressed/
+ * delta optional fields are int16, except lap which is a plain uint8.
+ * Verified against real data for bayviewmack2024 (DTF-only, flag 0x02) —
+ * other flag combinations are unverified.
+ */
+(function (global) {
+  'use strict';
+
+  const FLAG_ALT = 0x01;
+  const FLAG_DTF = 0x02;
+  const FLAG_LAP = 0x04;
+  const FLAG_PC = 0x08;
+  const COORD_SCALE = 100000.0;
+  const DTF_SCALE = 1000.0;
+
+  class Cursor {
+    constructor(buf) {
+      this.dv = new DataView(buf);
+      this.pos = 0;
+    }
+    remaining() { return this.dv.byteLength - this.pos; }
+    u8() { const v = this.dv.getUint8(this.pos); this.pos += 1; return v; }
+    u16() { const v = this.dv.getUint16(this.pos, false); this.pos += 2; return v; }
+    i16() { const v = this.dv.getInt16(this.pos, false); this.pos += 2; return v; }
+    u32() { const v = this.dv.getUint32(this.pos, false); this.pos += 4; return v; }
+    i32() { const v = this.dv.getInt32(this.pos, false); this.pos += 4; return v; }
+    peekU8() { return this.dv.getUint8(this.pos); }
+  }
+
+  function decodePositions(arrayBuffer) {
+    const cur = new Cursor(arrayBuffer);
+    if (cur.remaining() < 5) return [];
+
+    const flags = cur.u8();
+    const baseTimestamp = cur.u32();
+    const hasAlt = !!(flags & FLAG_ALT);
+    const hasDtf = !!(flags & FLAG_DTF);
+    const hasLap = !!(flags & FLAG_LAP);
+    const hasPc = !!(flags & FLAG_PC);
+
+    const trackers = [];
+
+    while (cur.remaining() >= 4) {
+      const teamId = cur.u16();
+      const numPositions = cur.u16();
+      const moments = [];
+      let prev = null;
+
+      for (let i = 0; i < numPositions; i++) {
+        if (cur.remaining() < 2) break;
+
+        const firstByte = cur.peekU8();
+        const compressed = !!(firstByte & 0x80);
+        let m;
+
+        if (compressed) {
+          const timeWord = cur.u16();
+          const deltaSeconds = timeWord & 0x7fff;
+          const dlat = cur.i16();
+          const dlon = cur.i16();
+
+          let alt = null, dtf = null, lap = null, pc = null;
+          if (hasAlt) alt = (prev && prev.alt != null ? prev.alt : 0) + cur.i16();
+          if (hasDtf) dtf = (prev && prev.dtf != null ? prev.dtf : 0) + cur.i16();
+          if (hasLap) lap = cur.u8();
+          if (hasPc) pc = (prev && prev.pc != null ? prev.pc : 0) + cur.i16();
+
+          if (prev == null) continue;
+
+          m = {
+            at: prev.at - deltaSeconds,
+            lat: prev.lat + dlat / COORD_SCALE,
+            lon: prev.lon + dlon / COORD_SCALE,
+            alt, dtf, lap, pc,
+          };
+        } else {
+          const offset = cur.u32();
+          const latRaw = cur.i32();
+          const lonRaw = cur.i32();
+
+          let alt = null, dtf = null, lap = null, pc = null;
+          if (hasAlt) alt = cur.i32();
+          if (hasDtf) dtf = cur.i32();
+          if (hasLap) lap = cur.u8();
+          if (hasPc) pc = cur.i32();
+
+          m = {
+            at: baseTimestamp + offset,
+            lat: latRaw / COORD_SCALE,
+            lon: lonRaw / COORD_SCALE,
+            alt, dtf, lap, pc,
+          };
+        }
+
+        moments.push(m);
+        prev = m;
+      }
+
+      trackers.push({ id: teamId, moments });
+    }
+
+    return trackers;
+  }
+
+  function toFloat(v) {
+    if (v === null || v === undefined) return null;
+    const f = parseFloat(v);
+    return Number.isNaN(f) ? null : f;
+  }
+
+  function decodeJsonBytes(buf) {
+    try {
+      return JSON.parse(new TextDecoder('utf-8').decode(buf));
+    } catch (e) {
+      return JSON.parse(new TextDecoder('latin1').decode(buf));
+    }
+  }
+
+  async function fetchWithRetry(url, { asJson = false, maxRetries = 5, timeoutMs = 60000 } = {}) {
+    let delay = 1000;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+      try {
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), timeoutMs);
+        const resp = await fetch(url, { signal: controller.signal });
+        clearTimeout(t);
+        if (resp.ok) {
+          return asJson ? decodeJsonBytes(await resp.arrayBuffer()) : await resp.arrayBuffer();
+        }
+        if (resp.status >= 400 && resp.status < 500) {
+          throw new Error(`HTTP ${resp.status} for ${url}`);
+        }
+        lastErr = new Error(`HTTP ${resp.status}`);
+      } catch (e) {
+        lastErr = e;
+      }
+      if (attempt <= maxRetries) {
+        const jitter = delay * (Math.random() * 0.5 - 0.25);
+        await new Promise((r) => setTimeout(r, Math.max(100, delay + jitter)));
+        delay *= 2;
+      }
+    }
+    throw new Error(`Failed after retries: ${url} (${lastErr})`);
+  }
+
+  async function loadRace(raceKey, { server = 'yb.tl', proxyBase = null } = {}) {
+    const setupUrl = proxyBase
+      ? `${proxyBase}?race=${encodeURIComponent(raceKey)}&feed=RaceSetup`
+      : `https://${server}/JSON/${raceKey}/RaceSetup`;
+    const positionsUrl = proxyBase
+      ? `${proxyBase}?race=${encodeURIComponent(raceKey)}&feed=AllPositions3`
+      : `https://${server}/BIN/${raceKey}/AllPositions3`;
+
+    const [setup, rawPositions] = await Promise.all([
+      fetchWithRetry(setupUrl, { asJson: true }),
+      fetchWithRetry(positionsUrl, { asJson: false }),
+    ]);
+
+    const trackers = decodePositions(rawPositions);
+    const positionsById = new Map(trackers.map((t) => [t.id, t.moments]));
+    const tagsById = new Map((setup.tags || []).map((t) => [t.id, t]));
+
+    const boats = (setup.teams || []).map((team) => {
+      const classNames = (team.tags || [])
+        .map((id) => tagsById.get(id))
+        .filter(Boolean)
+        .map((t) => t.name);
+
+      const moments = positionsById.get(team.id) || [];
+      const positions = moments
+        .map((m) => ({
+          timestamp: m.at,
+          lat: m.lat,
+          lon: m.lon,
+          dtf: m.dtf != null ? m.dtf / DTF_SCALE : null,
+          alt: m.alt,
+          lap: m.lap,
+          pc: m.pc,
+        }))
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+      return {
+        id: team.id,
+        name: team.name || `id=${team.id}`,
+        sail: team.sail,
+        model: team.model,
+        status: team.status,
+        classNames,
+        start: team.start,
+        started: team.started,
+        finishedAt: team.finishedAt ?? null,
+        tcf1: toFloat(team.tcf1),
+        tcf2: toFloat(team.tcf2),
+        tcf3: toFloat(team.tcf3),
+        positions,
+        get isFinished() { return this.finishedAt != null; },
+        latest() { return this.positions.length ? this.positions[this.positions.length - 1] : null; },
+      };
+    });
+
+    const course = setup.course || {};
+    const info = {
+      raceKey,
+      title: (setup.pro && setup.pro.name) || setup.title || raceKey,
+      start: setup.start,
+      stop: setup.stop,
+      tz: setup.tz || 'UTC',
+      tzOffset: setup.tzOffset || 0,
+      viewerMode: setup.viewerMode,
+      distanceNm: course.distance,
+      courseNodes: course.nodes || [],
+    };
+
+    return { info, boats };
+  }
+
+  global.YB = { loadRace, decodePositions };
+})(window);
+
+// ---- course + math (from dashboard) ----
+const ROUTE=[
+  [48.7696,-123.4570],[48.7691,-123.4565],[48.7681,-123.4552],[48.7661,-123.4534],
+  [48.7609,-123.4469],[48.7559,-123.4421],[48.7497,-123.4333],[48.7443,-123.4302],
+  [48.7378,-123.4245],[48.7325,-123.4231],[48.7289,-123.4276],[48.7157,-123.4584],
+  [48.7111,-123.4772],[48.7102,-123.4984],[48.7211,-123.5109],[48.7345,-123.5341],
+  [48.7443,-123.5545],[48.7579,-123.5629],[48.7695,-123.5672],[48.7766,-123.5557],
+  [48.7862,-123.5575],[48.7942,-123.5534],[48.7952,-123.5373],[48.7912,-123.5227],
+  [48.7950,-123.5380],[48.7958,-123.5500],[48.8059,-123.5504],[48.8123,-123.5603],[48.8149,-123.5706],[48.8216,-123.5777],
+  [48.8323,-123.5770],[48.8441,-123.5751],[48.8557,-123.5699],[48.8660,-123.5761],
+  [48.8740,-123.5821],[48.8836,-123.5837],[48.8909,-123.5901],[48.8995,-123.5962],
+  [48.9087,-123.5974],[48.9194,-123.5981],[48.9294,-123.6018],[48.9393,-123.6025],
+  [48.9489,-123.5970],[48.9440,-123.5802],[48.9353,-123.5648],[48.9279,-123.5493],
+  [48.9229,-123.5430],[48.9181,-123.5234],[48.9042,-123.5032],[48.8865,-123.4755],
+  [48.8762,-123.4549],[48.8621,-123.4304],[48.8415,-123.4160],[48.8367,-123.4311],
+  [48.8420,-123.4378],[48.8509,-123.4458],[48.8439,-123.4419],[48.8256,-123.4387],
+  [48.8123,-123.4221],[48.8025,-123.4099],[48.7998,-123.3938],[48.7963,-123.3891],
+  [48.7880,-123.3778],[48.7813,-123.3717],[48.7750,-123.3633],[48.7655,-123.3695],
+  [48.7539,-123.3811],[48.7525,-123.3932],[48.7531,-123.4174],[48.7549,-123.4338],
+  [48.7622,-123.4434],[48.7676,-123.4520],[48.7682,-123.4534],[48.7689,-123.4543],
+  [48.7695,-123.4560],[48.7698,-123.4566]
+];
+function hav([a,b],[c,d]){
+  const R=6371,r=Math.PI/180;
+  const da=(c-a)*r,db=(d-b)*r;
+  const x=Math.sin(da/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(db/2)**2;
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+const RDIST=(()=>{const d=[0];for(let i=1;i<ROUTE.length;i++)d.push(d[i-1]+hav(ROUTE[i-1],ROUTE[i]));return d})();
+const TOTAL=RDIST[RDIST.length-1];
+const REF_LAT = ROUTE.reduce((s,p)=>s+p[0],0)/ROUTE.length;
+const KM_PER_DEG_LAT = 111.32;
+const LON_SCALE = Math.cos(REF_LAT*Math.PI/180);
+function toXY([lat,lon]){ return [lon*KM_PER_DEG_LAT*LON_SCALE, lat*KM_PER_DEG_LAT]; }
+
+function ll2prog(lat, lon){
+  const p = toXY([lat, lon]);
+  let best = null;
+
+  for(let i=1;i<ROUTE.length;i++){
+    const a = toXY(ROUTE[i-1]);
+    const b = toXY(ROUTE[i]);
+    const abx=b[0]-a[0], aby=b[1]-a[1];
+    const segLenSq = abx*abx+aby*aby;
+    let t = segLenSq>0 ? ((p[0]-a[0])*abx+(p[1]-a[1])*aby)/segLenSq : 0;
+    t = Math.min(1, Math.max(0, t));
+    const projX=a[0]+t*abx, projY=a[1]+t*aby;
+    const dx=p[0]-projX, dy=p[1]-projY;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+
+    if(best===null || dist<best.dist){
+      const segLenKm = hav(ROUTE[i-1], ROUTE[i]);
+      const along = RDIST[i-1] + t*segLenKm;
+      best = {dist, along, segmentIndex:i};
+    }
+  }
+
+  return {
+    prog: best.along/TOTAL,
+    distFromRouteKm: best.dist,
+    segmentIndex: best.segmentIndex,
+  };
+}
+
+// ---- crew state + quartiles (from dashboard) ----
+let crews=[];
+function quartiles(){
+  const s=[...crews].sort((a,b)=>b.prog-a.prog);
+  const q=Math.ceil(s.length/4);
+  let r=1;
+  const qs=[s.slice(0,q),s.slice(q,2*q),s.slice(2*q,3*q),s.slice(3*q)];
+  qs.forEach(g=>g.forEach(c=>c.rank=r++));
+  return qs;
+}
+
+// ---- params ----
+const params=new URLSearchParams(location.search);
+const RACE_KEY=(params.get('race')||'RAR2026').trim();
+let myBoatQ = (()=>{ const b=BOATS.find(x=>String(x.n)===(params.get('boat')||'')); return b?b.q:null; })();
+
+// ---- map ----
+const map=L.map('map',{center:[48.84,-123.50],zoom:11,zoomControl:false});
+L.control.zoom({position:'topleft'}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  {attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
+L.polyline(ROUTE,{color:'#94a3b8',weight:2.5,opacity:0.5,dashArray:'6,5'}).addTo(map);
+L.marker(ROUTE[0],{icon:L.divIcon({className:'',html:'<div class="start-flag">⚑ START / FINISH</div>',iconAnchor:[50,10]})}).addTo(map);
+
+// ---- boat selector ----
+(function fillSel(){
+  const sel=document.getElementById('boat-sel');
+  sel.innerHTML='<option value="all">All crews</option>'+
+    BOATS.map(b=>`<option value="${b.q}">${b.label} (Q${b.q+1})</option>`).join('');
+  sel.value = myBoatQ==null ? 'all' : String(myBoatQ);
+})();
+function onBoatChange(){
+  const v=document.getElementById('boat-sel').value;
+  myBoatQ = v==='all' ? null : Number(v);
+  renderAll();
+}
+
+// ---- my position (device GPS) ----
+let myPos=null, myMarker=null, centeredOnce=false;
+function startGeo(){
+  if(!navigator.geolocation){ return; }
+  navigator.geolocation.watchPosition(p=>{
+    myPos={lat:p.coords.latitude, lon:p.coords.longitude};
+    if(!myMarker){
+      myMarker=L.marker([myPos.lat,myPos.lon],{icon:L.divIcon({className:'',html:'<div class="me-dot"></div>',iconSize:[22,22],iconAnchor:[11,11]}),zIndexOffset:2000}).addTo(map).bindTooltip('You',{direction:'top'});
+    } else {
+      myMarker.setLatLng([myPos.lat,myPos.lon]);
+    }
+    if(!centeredOnce){ map.setView([myPos.lat,myPos.lon],12); centeredOnce=true; }
+    renderRows();
+  }, err=>{
+    console.warn('geolocation error', err);
+  }, {enableHighAccuracy:true, maximumAge:15000, timeout:20000});
+}
+
+// ---- poll ----
+let lastUpdate=0, crewMarkers=[];
+async function poll(){
+  try{
+    const race=await YB.loadRace(RACE_KEY,{proxyBase:YB_PROXY_BASE});
+    const next=[];
+    race.boats.forEach(b=>{
+      const p=b.latest(); if(!p) return;
+      if(SAFETY_BOAT_IDS[b.id]) return;           // skip safety launches
+      const proj=ll2prog(p.lat,p.lon);
+      next.push({
+        id:b.id,
+        name:TRACKER_ID_MAP[b.id]||b.name,
+        lat:p.lat, lon:p.lon,
+        sog:b.sogKmh!=null?b.sogKmh:null,
+        prog:proj.prog,
+        off:proj.distFromRouteKm>OFF_COURSE_KM,
+      });
+    });
+    if(next.length){
+      crews=next;
+      lastUpdate=Date.now();
+    }
+    renderAll();
+  }catch(e){
+    console.warn('poll failed',e);
+    renderAll();
+  }
+}
+
+// speed from consecutive fixes (YB feed carries dtf, not sog) ----
+let lastFix=new Map();
+function computeSpeeds(){
+  crews.forEach(c=>{
+    const prev=lastFix.get(c.id);
+    if(prev){
+      const dtH=(Date.now()-prev.t)/3600000;
+      // only trust if we actually have two distinct polls
+      if(prev.lat!==c.lat||prev.lon!==c.lon){
+        const km=hav([prev.lat,prev.lon],[c.lat,c.lon]);
+        if(dtH>0) c.sog=km/dtH;
+      } else if(c.sog==null){ c.sog=prev.sog; }
+    }
+    lastFix.set(c.id,{lat:c.lat,lon:c.lon,t:Date.now(),sog:c.sog});
+  });
+}
+
+// ---- render ----
+function renderAll(){ computeSpeeds(); quartiles(); renderMarkers(); renderRows(); updatePill(); }
+
+function renderMarkers(){
+  crewMarkers.forEach(m=>map.removeLayer(m)); crewMarkers=[];
+  const qs=quartiles();
+  qs.forEach((qc,qi)=>{
+    const mine = myBoatQ==null || qi===myBoatQ;
+    qc.forEach(c=>{
+      const cls='cmk'+(mine?'':' small')+(c.off&&mine?' off':'');
+      const col=c.off?'#ef4444':Q_COLORS[qi];
+      const mk=L.marker([c.lat,c.lon],{icon:L.divIcon({className:'',html:`<div class="${cls}" style="background:${col}">${c.rank}</div>`,iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:mine?600:200}).addTo(map)
+        .bindTooltip(`<b>${c.name}</b><br/>#${c.rank} · ${c.sog!=null?c.sog.toFixed(1)+' km/h':'—'}${c.off?'<br/><b style="color:#f87171">OFF COURSE</b>':''}`,{direction:'top',offset:[0,-12]});
+      crewMarkers.push(mk);
+    });
+  });
+}
+
+function distFromMe(c){ return myPos ? hav([myPos.lat,myPos.lon],[c.lat,c.lon]) : null; }
+
+function renderRows(){
+  const qs=quartiles();
+  let list=[];
+  if(myBoatQ==null){ list=qs.flat(); }
+  else { list=qs[myBoatQ]||[]; }
+
+  const rowsEl=document.getElementById('rows');
+  const emptyEl=document.getElementById('empty');
+  document.getElementById('sheet-title').textContent = myBoatQ==null ? 'All crews' : `${BOATS.find(b=>b.q===myBoatQ).label}`;
+  document.getElementById('sheet-cnt').textContent = list.length ? `${list.length} crew${list.length>1?'s':''}` : '';
+
+  if(!list.length){
+    rowsEl.innerHTML='';
+    emptyEl.style.display='block';
+    emptyEl.textContent = crews.length ? 'Waiting for crews in your quartile…' : 'No crew positions yet. The YB feed usually goes live ~2 days before race day.';
+    return;
+  }
+  emptyEl.style.display='none';
+
+  // attention first (off-course, then off-pace), then nearest to me, then rank
+  const scored=list.map(c=>({c,d:distFromMe(c)}));
+  scored.sort((a,b)=>{
+    const aw=(a.c.off?2:0)+(a.c.sog!=null&&a.c.sog<OFF_PACE_KMH?1:0);
+    const bw=(b.c.off?2:0)+(b.c.sog!=null&&b.c.sog<OFF_PACE_KMH?1:0);
+    if(bw!==aw) return bw-aw;
+    if(a.d!=null&&b.d!=null&&a.d!==b.d) return a.d-b.d;
+    return a.c.rank-b.c.rank;
+  });
+
+  rowsEl.innerHTML=scored.map(({c,d})=>{
+    const qi=c._qi;
+    const col=c.off?'#ef4444':Q_COLORS[qi==null?3:qi];
+    const offPace=c.sog!=null&&c.sog<OFF_PACE_KMH;
+    const flags=(c.off?'<span class="flags sos"> 📍off-course</span>':'')+(offPace&&!c.off?'<span class="flags warn"> ⚡slow</span>':'');
+    const toFin=((1-c.prog)*TOTAL).toFixed(1);
+    return `<div class="row">
+      <span class="rk" style="background:${col}">${c.rank}</span>
+      <span class="nm ${c.off?'sos':offPace?'warn':''}">${c.name}${flags}</span>
+      <span class="met"><span class="big">${d!=null?d.toFixed(1)+' km':'—'}</span><span class="sub">from you</span></span>
+      <span class="met"><span class="big">${c.sog!=null?c.sog.toFixed(1):'—'}</span><span class="sub">km/h · ${toFin}km to fin</span></span>
+    </div>`;
+  }).join('');
+}
+
+// tag each crew with its quartile index for row colouring
+function tagQuartiles(qs){ qs.forEach((qc,qi)=>qc.forEach(c=>c._qi=qi)); return qs; }
+const _origQuartiles=quartiles;
+quartiles=function(){ return tagQuartiles(_origQuartiles()); };
+
+function banner(msg,amber){
+  const el=document.getElementById('banner');
+  if(!msg){ el.className=''; el.textContent=''; return; }
+  el.textContent=msg; el.className='show'+(amber?' amber':'');
+}
+
+function updatePill(){
+  const pill=document.getElementById('pill');
+  const age=lastUpdate?Date.now()-lastUpdate:Infinity;
+  // attention banner from my quartile
+  const qs=quartiles();
+  const mine = myBoatQ==null ? qs.flat() : (qs[myBoatQ]||[]);
+  const off=mine.filter(c=>c.off).length;
+  const slow=mine.filter(c=>c.sog!=null&&c.sog<OFF_PACE_KMH&&!c.off).length;
+  if(off){ banner(`⚠ ${off} crew off course`,false); }
+  else if(slow){ banner(`⚡ ${slow} crew off pace`,true); }
+  else { banner(''); }
+
+  if(!lastUpdate){ pill.className=''; pill.textContent='connecting…'; return; }
+  const s=Math.round(age/1000);
+  if(age>STALE_MS){ pill.className='stale'; pill.textContent=`⚠ stale ${s>90?Math.round(s/60)+'m':s+'s'}`; }
+  else { pill.className=''; pill.textContent=`updated ${s}s ago`; }
+}
+
+// ---- go ----
+startGeo();
+poll();
+setInterval(poll, POLL_MS);
+setInterval(updatePill, 1000);
+</script>
+</body>
+</html>
