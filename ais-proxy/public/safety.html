@@ -42,7 +42,7 @@ body{background:#0f172a;color:#e2e8f0;font-family:-apple-system,'Segoe UI',syste
 .cmk.off{border-color:#ef4444;animation:apulse .8s infinite}
 @keyframes apulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.8)}50%{box-shadow:0 0 0 9px rgba(239,68,68,0)}}
 .cmk.small{width:16px;height:16px;font-size:9px;opacity:.55}
-.start-flag{background:#f8fafc;color:#0f172a;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:800;white-space:nowrap}
+.start-flag{background:#0f172a;color:#f8fafc;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:800;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.4)}
 </style>
 </head>
 <body>
@@ -403,9 +403,9 @@ let myBoatQ = (()=>{ const b=BOATS.find(x=>String(x.n)===(params.get('boat')||''
 // ---- map ----
 const map=L.map('map',{center:[48.84,-123.50],zoom:11,zoomControl:false});
 L.control.zoom({position:'topleft'}).addTo(map);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
   {attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
-L.polyline(ROUTE,{color:'#94a3b8',weight:2.5,opacity:0.5,dashArray:'6,5'}).addTo(map);
+L.polyline(ROUTE,{color:'#334155',weight:3,opacity:0.8,dashArray:'6,5'}).addTo(map);
 L.marker(ROUTE[0],{icon:L.divIcon({className:'',html:'<div class="start-flag">⚑ START / FINISH</div>',iconAnchor:[50,10]})}).addTo(map);
 
 // ---- boat selector ----
