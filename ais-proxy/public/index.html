@@ -114,6 +114,10 @@ button:disabled{opacity:.5;cursor:default;filter:none}
 .gate-dir{color:#64748b;font-size:10px;margin-top:1px}
 #btn-gates{background:#334155;color:#5eead4}
 .race-mode #btn-advance,.race-mode #btn-sos,.race-mode #btn-reset{display:none}
+#ferry-bar{display:none;padding:8px 14px;font-size:12px;font-weight:700;text-align:center;flex-shrink:0;letter-spacing:.01em}
+#ferry-bar.show{display:block}
+#ferry-bar.warn{background:#422006;color:#fde68a;border-bottom:1px solid #d97706}
+#ferry-bar.danger{background:#450a0a;color:#fecaca;border-bottom:1px solid #ef4444;animation:blink 1s infinite}
 </style>
 </head>
 <body>
@@ -127,6 +131,8 @@ button:disabled{opacity:.5;cursor:default;filter:none}
   <div class="chip"><span>Max response </span><strong id="s-resp">—</strong></div>
   <div id="clock">T + 4:30:00</div>
 </div>
+
+<div id="ferry-bar"></div>
 
 <div id="main">
   <div id="map"></div>
@@ -816,6 +822,7 @@ function render(){
   }
 
   renderSidebar(qs);
+  checkFerryIntercepts();
 }
 
 // ── LIVE SAFETY-BOAT MARKERS ─────────────────────────────────
@@ -1007,6 +1014,68 @@ function renderAIS(){
   });
 }
 
+// ── FERRY INTERCEPT PREDICTION ───────────────────────────────
+// For each MOVING ferry, project its track forward and compare against each
+// crew's projected position along the course; if the closest predicted
+// approach (CPA) falls inside the warn/danger radius within the horizon,
+// flag it (banner + coloured line & rings). Ferry sog is knots; crew sog is
+// km/h and crews are projected along the course via their prog. Runs even
+// when the AIS layer is toggled off, so the alert can't be hidden.
+const FI_HORIZON_MIN = 12;     // look-ahead window (minutes)
+const FI_STEP_MIN    = 0.5;    // sampling resolution
+const FI_WARN_KM     = 1.5;    // ~0.8 nm
+const FI_DANGER_KM   = 0.75;   // ~0.4 nm
+const FI_MIN_FERRY_KN= 3;      // ignore docked/idle ferries
+let ferryThreats=[], threatMarkers=[];
+
+function ferryFuturePos(v, tHours){ return projectAhead(v.lat, v.lon, v.cog, v.sog*tHours); }
+function crewFuturePos(c, tHours){ return p2ll(Math.min(1, c.prog + (c.sog*tHours)/TOTAL)); }
+
+function checkFerryIntercepts(){
+  const ferries=(AIS_VESSELS||[]).filter(v=>v.cat==='ferry' && v.sog>FI_MIN_FERRY_KN
+    && Number.isFinite(v.lat) && Number.isFinite(v.lon));
+  const threats=[];
+  ferries.forEach(v=>{
+    let best=null;
+    crews.forEach(c=>{
+      if(c.prog==null) return;
+      let minKm=Infinity, minT=0;
+      for(let t=0;t<=FI_HORIZON_MIN;t+=FI_STEP_MIN){
+        const th=t/60;
+        const d=hav(ferryFuturePos(v,th), crewFuturePos(c,th));
+        if(d<minKm){ minKm=d; minT=t; }
+      }
+      if(minKm<FI_WARN_KM && (best===null || minKm<best.cpaKm)) best={crew:c,cpaKm:minKm,tMin:minT};
+    });
+    if(best) threats.push({vessel:v, crew:best.crew, cpaKm:best.cpaKm, tMin:best.tMin,
+      level: best.cpaKm<FI_DANGER_KM ? 'danger':'warn'});
+  });
+  ferryThreats = threats.sort((a,b)=>a.cpaKm-b.cpaKm);
+  renderFerryThreats();
+}
+
+function renderFerryThreats(){
+  threatMarkers.forEach(m=>map.removeLayer(m)); threatMarkers=[];
+  const bar=document.getElementById('ferry-bar');
+  if(!ferryThreats.length){ if(bar){ bar.className=''; bar.textContent=''; } return; }
+  const anyDanger=ferryThreats.some(t=>t.level==='danger');
+  if(bar){
+    bar.className='show'+(anyDanger?' danger':' warn');
+    bar.innerHTML = (anyDanger?'🚨 POSSIBLE FERRY INTERCEPT — ':'⚠ Ferry approaching crews — ')+
+      ferryThreats.slice(0,3).map(t=>
+        `${t.vessel.name||'Ferry'} → ${t.crew.name} (${(t.cpaKm/1.852).toFixed(1)} nm, ~${Math.round(t.tMin)} min)`
+      ).join('  ·  ');
+  }
+  ferryThreats.forEach(t=>{
+    const col = t.level==='danger' ? '#ef4444' : '#f59e0b';
+    const fPos=[t.vessel.lat,t.vessel.lon];
+    const cPos=p2ll(t.crew.prog);
+    threatMarkers.push(L.polyline([fPos,cPos],{color:col,weight:2.5,opacity:.9,dashArray:'4 5'}).addTo(map));
+    threatMarkers.push(L.circleMarker(fPos,{radius:15,color:col,weight:3,opacity:.95,fill:false}).addTo(map));
+    threatMarkers.push(L.circleMarker(cPos,{radius:15,color:col,weight:3,opacity:.95,fill:false}).addTo(map));
+  });
+}
+
 // ── LIVE AIS FEED (your Pi → AISHub → Vercel proxy) ──────────
 const AIS_PROXY_URL = 'https://jwds.vercel.app/api/ais';
 const YB_PROXY_BASE  = 'https://jwds.vercel.app/api/yb';   // server-side YB proxy (CORS-safe); see ais-proxy/api/yb.js
@@ -1022,6 +1091,7 @@ async function fetchLiveAIS(){
       AIS_VESSELS = data.vessels;        // replace fallback with live targets
       aisLastCount = data.vessels.length;
       if(showAIS) renderAIS();           // repaint if the layer is on
+      checkFerryIntercepts();
     }
   }catch(e){
     console.warn('Live AIS fetch failed; keeping last known positions', e);
