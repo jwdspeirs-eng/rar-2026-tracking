@@ -16,6 +16,7 @@ body{background:#0f172a;color:#e2e8f0;font-family:-apple-system,'Segoe UI',syste
 #pill{margin-left:auto;font-size:11px;font-weight:700;padding:5px 10px;border-radius:999px;white-space:nowrap;background:#064e3b;color:#6ee7b7;border:1px solid #059669}
 #pill.stale{background:#450a0a;color:#fca5a5;border-color:#ef4444}
 #pill.warn{background:#422006;color:#fcd34d;border-color:#d97706}
+#btn-ais{background:#0f172a;border:1px solid #334155;color:#7dd3fc;border-radius:8px;padding:8px 10px;font-size:15px;line-height:1;cursor:pointer;flex-shrink:0}
 #map{flex:1;min-height:0}
 #banner{display:none;background:#450a0a;border-top:1px solid #ef4444;color:#fecaca;font-size:13px;font-weight:700;padding:9px 12px;text-align:center;flex-shrink:0}
 #banner.show{display:block}
@@ -48,6 +49,7 @@ body{background:#0f172a;color:#e2e8f0;font-family:-apple-system,'Segoe UI',syste
 <div id="top">
   <h1>🚨 Safety</h1>
   <select id="boat-sel" onchange="onBoatChange()"></select>
+  <button id="btn-ais" onclick="toggleAIS()" title="Ferry / commercial traffic">⛴</button>
   <span id="pill">connecting…</span>
 </div>
 <div id="banner"></div>
@@ -577,10 +579,65 @@ function updatePill(){
   else { pill.className=''; pill.textContent=`updated ${s}s ago`; }
 }
 
+// ---- AIS traffic (live commercial vessels via the Vercel proxy) ----
+// Safety boats care most about ferries and other commercial traffic whose
+// course could cross the racers. LIVE positions only (no stale fallback);
+// each moving vessel gets a projected course line so a crossing shows early.
+const AIS_PROXY_URL = 'https://jwds.vercel.app/api/ais';
+const AIS_COMMERCIAL = new Set(['ferry','coastguard','military_law','cargo']);
+const AIS_VECTOR_MIN = 10;   // minutes of course projected ahead
+let aisVessels=[], aisMarkers=[], showAIS=true;
+
+function projectAhead(lat, lon, cogDeg, distNm){
+  const R=3440.065, d=distNm/R, b=cogDeg*Math.PI/180;
+  const p1=lat*Math.PI/180, l1=lon*Math.PI/180;
+  const p2=Math.asin(Math.sin(p1)*Math.cos(d)+Math.cos(p1)*Math.sin(d)*Math.cos(b));
+  const l2=l1+Math.atan2(Math.sin(b)*Math.sin(d)*Math.cos(p1), Math.cos(d)-Math.sin(p1)*Math.sin(p2));
+  return [p2*180/Math.PI, l2*180/Math.PI];
+}
+
+function renderAIS(){
+  aisMarkers.forEach(m=>map.removeLayer(m)); aisMarkers=[];
+  if(!showAIS) return;
+  const style={ferry:{c:'#0ea5e9',big:true},coastguard:{c:'#f97316'},military_law:{c:'#a855f7'},cargo:{c:'#94a3b8'}};
+  aisVessels.filter(v=>AIS_COMMERCIAL.has(v.cat)).forEach(v=>{
+    const s=style[v.cat]||{c:'#94a3b8'};
+    const label=v.name||(v.cat==='ferry'?'FERRY':'·');
+    const fs=s.big?12:10;
+    const html=`<div style="background:${s.c};color:#fff;border-radius:4px;padding:2px 6px;font-size:${fs}px;font-weight:800;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.3)">${label}</div>`;
+    const icon=L.divIcon({className:'',html,iconAnchor:[0,10]});
+    const tip=`<b>${v.name||'Unknown'}</b> · ${v.cat.replace('_',' ')}<br/>${v.sog} kn · COG ${v.cog}°`+(v.dest?'<br/>→ '+v.dest:'');
+    if(v.sog>0.5){
+      const end=projectAhead(v.lat,v.lon,v.cog,v.sog*(AIS_VECTOR_MIN/60));
+      aisMarkers.push(L.polyline([[v.lat,v.lon],end],{color:s.c,weight:2.5,opacity:.85,dashArray:'5 4'}).addTo(map));
+      const arrow=L.divIcon({className:'',html:`<div style="transform:rotate(${v.cog}deg);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:11px solid ${s.c}"></div>`,iconSize:[12,11],iconAnchor:[6,6]});
+      aisMarkers.push(L.marker(end,{icon:arrow,zIndexOffset:500}).addTo(map));
+    }
+    aisMarkers.push(L.marker([v.lat,v.lon],{icon,zIndexOffset:s.big?550:400}).addTo(map).bindTooltip(tip,{direction:'top'}));
+  });
+}
+
+async function fetchAIS(){
+  try{
+    const r=await fetch(AIS_PROXY_URL,{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    if(d && Array.isArray(d.vessels)){ aisVessels=d.vessels; renderAIS(); }
+  }catch(e){ console.warn('AIS fetch failed (needs AISHUB_USERNAME set in Vercel)', e); }
+}
+
+function toggleAIS(){
+  showAIS=!showAIS;
+  document.getElementById('btn-ais').style.opacity=showAIS?'1':'.45';
+  if(showAIS){ renderAIS(); } else { aisMarkers.forEach(m=>map.removeLayer(m)); aisMarkers=[]; }
+}
+
 // ---- go ----
 startGeo();
 poll();
+fetchAIS();
 setInterval(poll, POLL_MS);
+setInterval(fetchAIS, POLL_MS);
 setInterval(updatePill, 1000);
 </script>
 </body>
