@@ -85,6 +85,7 @@ button:disabled{opacity:.5;cursor:default;filter:none}
 .sar-marker{background:#facc15;color:#0f172a;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:800;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.6);border:1px solid #eab308}
 
 #btn-ais{background:#334155;color:#e2e8f0}
+#btn-basemap{background:#334155;color:#e2e8f0}
 
 /* LIVE YB TEST / LIVE MODE PANEL */
 #yb-panel{display:none;position:fixed;top:56px;right:16px;width:340px;max-height:80vh;overflow-y:auto;background:#1e293b;border:1px solid #334155;border-radius:8px;z-index:2500;box-shadow:0 8px 24px rgba(0,0,0,.5)}
@@ -153,6 +154,7 @@ button:disabled{opacity:.5;cursor:default;filter:none}
   <button id="btn-advance" onclick="advance()">⏩ Advance +15 min</button>
   <button id="btn-sos" onclick="doSOS()">🚨 Simulate SOS</button>
   <button id="btn-coverage" onclick="toggleCov()">⭕ Coverage Zones</button>
+  <button id="btn-basemap" onclick="toggleBasemap()">☀ Day map</button>
   <button id="btn-reset" onclick="reset()">↺ Reset</button>
   <button id="btn-ais" onclick="toggleAIS()">⛴ AIS Traffic</button>
   <button id="btn-ais-mode" onclick="toggleAISMode()" disabled>⛴ Commercial only</button>
@@ -585,11 +587,28 @@ function midPos(qc){
 // ── MAP ──────────────────────────────────────────────────────
 const RAR_VIEW = {center:[48.84,-123.50], zoom:11};
 const map=L.map('map',{center:RAR_VIEW.center,zoom:RAR_VIEW.zoom});
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-  attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:19
-}).addTo(map);
+const BASEMAPS={
+  dark:L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:19}),
+  light:L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+    attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:19}),
+};
+let baseMode='dark';
+BASEMAPS.dark.addTo(map);
+function toggleBasemap(){
+  const next = baseMode==='dark' ? 'light' : 'dark';
+  map.removeLayer(BASEMAPS[baseMode]);
+  BASEMAPS[next].addTo(map);
+  baseMode=next;
+  // keep the course line readable on whichever basemap is active
+  if(typeof routeLine!=='undefined') routeLine.setStyle(next==='light'
+    ? {color:'#334155',opacity:0.8,weight:3}
+    : {color:'#94a3b8',opacity:0.5,weight:2.5});
+  const btn=document.getElementById('btn-basemap');
+  if(btn) btn.textContent = next==='dark' ? '☀ Day map' : '🌙 Night map';
+}
 
-L.polyline(ROUTE,{color:'#94a3b8',weight:2.5,opacity:0.5,dashArray:'6,5'}).addTo(map);
+const routeLine=L.polyline(ROUTE,{color:'#94a3b8',weight:2.5,opacity:0.5,dashArray:'6,5'}).addTo(map);
 
 const startIcon=L.divIcon({className:'',html:'<div class="start-flag">⚑ START / FINISH</div>',iconAnchor:[50,10]});
 L.marker(ROUTE[0],{icon:startIcon}).addTo(map).bindPopup('<b>Fulford Harbour</b><br/>Race Start / Finish');
