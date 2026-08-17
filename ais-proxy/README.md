@@ -51,3 +51,40 @@ adjust the mapping in `api/ais.js` if needed before relying on it for the race.
   Spring / Gulf Islands course. Widen or narrow as needed.
 - `typeToCat()` maps AIS ship-type codes to the dashboard's categories. Adjust
   once you see what real traffic reports.
+
+---
+
+# RAR YB Proxy (`api/yb.js`)
+
+Same idea as the AIS proxy, for the Yellow Brick race feed. On race day the
+dashboard and the safety-boat view run on Starlink/cellular and fetch the YB
+feed cross-origin; if the browser blocks a direct request to `yb.tl`, this
+proxy sits in front of it and adds CORS headers.
+
+It exposes the two feeds the client needs, allowlisted so it can't be used as an
+open proxy:
+
+```
+https://<project>.vercel.app/api/yb?race=RAR2026&feed=RaceSetup      -> JSON
+https://<project>.vercel.app/api/yb?race=RAR2026&feed=AllPositions3  -> binary
+```
+
+The dashboard (`YB.loadRace(key, {proxyBase})`) and the safety-boat view build
+exactly those URLs. In the dashboard's Live-YB panel there's a "Route via Vercel
+proxy" checkbox (on by default); uncheck it to fetch `yb.tl` directly.
+
+## Deploy
+
+No new env vars needed. From this folder:
+
+```
+vercel --prod
+```
+
+That redeploys the `jwds` project with both `api/ais` and `api/yb`.
+
+## Test
+
+`https://jwds.vercel.app/api/yb?race=bayviewmack2024&feed=RaceSetup` should
+return the RaceSetup JSON for the API doc's worked example. Before ~2 days
+pre-race, `race=RAR2026` may 404 until YB switches the feed on — that's expected.
