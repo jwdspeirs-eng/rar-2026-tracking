@@ -1388,7 +1388,7 @@ function startLiveMode(raceKey){
   document.getElementById('btn-live-start').disabled=true;
   document.getElementById('btn-live-stop').disabled=false;
   document.getElementById('live-race-key').disabled=true;
-  document.getElementById('sim-note').textContent='LIVE — fleet data from yb.tl, projected onto RAR course';
+  document.getElementById('sim-note').textContent='LIVE ('+liveRaceKey+') — fleet from yb.tl, projected onto RAR course';
 
   pollLiveRace();
   livePollTimer = setInterval(pollLiveRace, LIVE_POLL_MS);
@@ -1424,11 +1424,13 @@ render();
 // race and hide the demo-only controls (Advance / Simulate SOS / Reset) so
 // simulated data can't be shown under a LIVE badge or injected over the feed.
 // Append ?demo=1 to the URL to get the full demo/testing controls back.
-const RACE_MODE = !new URLSearchParams(location.search).has('demo');
+const _p = new URLSearchParams(location.search);
+const RACE_MODE = !_p.has('demo');
+const RACE_KEY  = _p.get('race') || 'RAR2026';   // e.g. ?race=RARtest26 for the drive test
 if(RACE_MODE){
   document.body.classList.add('race-mode');
   crews=[];                    // don't paint the demo fleet under a LIVE badge
-  startLiveMode('RAR2026');    // proxy on by default via ybOpts()
+  startLiveMode(RACE_KEY);     // proxy on by default via ybOpts()
 }
 </script>
 </body>
