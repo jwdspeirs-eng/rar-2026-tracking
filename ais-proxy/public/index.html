@@ -86,6 +86,7 @@ button:disabled{opacity:.5;cursor:default;filter:none}
 
 #btn-ais{background:#334155;color:#e2e8f0}
 #btn-basemap{background:#334155;color:#e2e8f0}
+#btn-assign{background:#334155;color:#e2e8f0}
 
 /* LIVE YB TEST / LIVE MODE PANEL */
 #yb-panel{display:none;position:fixed;top:56px;right:16px;width:340px;max-height:80vh;overflow-y:auto;background:#1e293b;border:1px solid #334155;border-radius:8px;z-index:2500;box-shadow:0 8px 24px rgba(0,0,0,.5)}
@@ -160,6 +161,7 @@ button:disabled{opacity:.5;cursor:default;filter:none}
   <button id="btn-advance" onclick="advance()">⏩ Advance +15 min</button>
   <button id="btn-sos" onclick="doSOS()">🚨 Simulate SOS</button>
   <button id="btn-coverage" onclick="toggleCov()">⭕ Coverage Zones</button>
+  <button id="btn-assign" onclick="toggleAssign()">◑ Zones: Gap-aware</button>
   <button id="btn-basemap" onclick="toggleBasemap()">☀ Day map</button>
   <button id="btn-reset" onclick="reset()">↺ Reset</button>
   <button id="btn-ais" onclick="toggleAIS()">⛴ AIS Traffic</button>
@@ -576,13 +578,65 @@ function ll2prog(lat, lon){
   };
 }
 
-function quartiles(){
-  const s=[...crews].sort((a,b)=>b.prog-a.prog);
-  const q=Math.ceil(s.length/4);
-  let r=1;
-  const qs=[s.slice(0,q),s.slice(q,2*q),s.slice(2*q,3*q),s.slice(3*q)];
-  qs.forEach(g=>g.forEach(c=>c.rank=r++));
-  return qs;
+// Boat assignment. Two modes:
+//   'gap'   — cluster crews by where they ACTUALLY are on the course, using a
+//             balanced min-max-span partition: split the field into 4 zones so
+//             the LARGEST zone is as small as possible. Real gaps drive the
+//             split, and a breakaway gets its own boat only when that actually
+//             lowers the worst-case crew→boat distance. DEFAULT.
+//   'count' — original equal-count-by-rank quartiles (fallback, ?assign=count).
+let assignMode = new URLSearchParams(location.search).get('assign')==='count' ? 'count' : 'gap';
+
+function rankSorted(){
+  const s=[...crews].filter(c=>c.prog!=null).sort((a,b)=>b.prog-a.prog);
+  s.forEach((c,i)=>c.rank=i+1);   // overall race position
+  return s;
+}
+
+function quartilesCount(){
+  const s=rankSorted();
+  const q=Math.max(1,Math.ceil(s.length/4));
+  return [s.slice(0,q),s.slice(q,2*q),s.slice(2*q,3*q),s.slice(3*q)];
+}
+
+function quartilesGap(){
+  const s=rankSorted();
+  const n=s.length;
+  if(n===0) return [[],[],[],[]];
+  if(n<=4){ const g=[[],[],[],[]]; s.forEach((c,i)=>g[i].push(c)); return g; }
+  // Partition the position-sorted field into 4 contiguous zones so the LARGEST
+  // zone span is minimised (each boat sits mid-zone → worst crew distance =
+  // span/2). Exact via DP: dp[k][i] = min achievable max-span using k zones to
+  // cover the first i crews. O(K·n²), trivial at fleet size.
+  const K=4;
+  const prog=s.map(c=>c.prog);
+  const span=(a,b)=>(prog[a]-prog[b])*TOTAL;          // a≤b, prog descending → ≥0
+  const INF=Infinity;
+  const dp=Array.from({length:K+1},()=>new Array(n+1).fill(INF));
+  const cut=Array.from({length:K+1},()=>new Array(n+1).fill(0));
+  dp[0][0]=0;
+  for(let k=1;k<=K;k++){
+    for(let i=1;i<=n;i++){
+      for(let j=k-1;j<i;j++){
+        if(dp[k-1][j]===INF) continue;
+        const cand=Math.max(dp[k-1][j], span(j,i-1));
+        if(cand<dp[k][i]){ dp[k][i]=cand; cut[k][i]=j; }
+      }
+    }
+  }
+  const groups=[]; let i=n, k=K;
+  while(k>0){ const j=cut[k][i]; groups.unshift(s.slice(j,i)); i=j; k--; }
+  while(groups.length<4) groups.push([]);
+  return groups;
+}
+
+function quartiles(){ return assignMode==='gap' ? quartilesGap() : quartilesCount(); }
+
+function toggleAssign(){
+  assignMode = assignMode==='gap' ? 'count' : 'gap';
+  const btn=document.getElementById('btn-assign');
+  if(btn) btn.textContent = assignMode==='gap' ? '◑ Zones: Gap-aware' : '◐ Zones: Even count';
+  render();
 }
 
 function midPos(qc){
@@ -850,13 +904,37 @@ function drawLiveSafetyBoats(){
 }
 
 // ── SIDEBAR ──────────────────────────────────────────────────
+// gap (km) from the trailing edge of group qi to the leading edge of the next
+// non-empty group astern — i.e. how big the empty water is behind this zone.
+function gapToNextKm(qs, qi){
+  if(!qs[qi] || !qs[qi].length) return null;
+  for(let j=qi+1;j<qs.length;j++){
+    if(qs[j] && qs[j].length){
+      const myTrail=qs[qi][qs[qi].length-1];   // lowest-prog crew of my group
+      const nextLead=qs[j][0];                  // highest-prog crew astern
+      return (myTrail.prog - nextLead.prog)*TOTAL;
+    }
+  }
+  return null;
+}
+
 function renderSidebar(qs){
   const html=qs.map((qc,qi)=>{
     const col=Q_COLORS[qi];
     const boat=Q_BOATS[qi];
-    if(qc.length===0) return '';
+    if(qc.length===0){
+      return `<div class="q-card" style="border-color:${col};opacity:.55">
+        <div class="q-header">
+          <span class="q-label" style="background:${col}22;color:${col}">${Q_NAMES[qi]}</span>
+          <div style="margin-left:auto;text-align:right"><div class="q-boat-name" style="color:${col}">${boat.label}</div></div>
+        </div>
+        <div style="padding:3px 12px 10px;font-size:11px;color:#64748b">Standby — no crews in this zone</div>
+      </div>`;
+    }
     const ps=qc.map(c=>c.prog);
     const span=(Math.max(...ps)-Math.min(...ps))*TOTAL;
+    const gap=gapToNextKm(qs,qi);
+    const gapTxt = gap!=null ? ` · ${gap.toFixed(1)} km to next group` : '';
 
     const rows=qc.map(c=>{
       const isSOS=sosActive&&c.id===sosId;
@@ -873,10 +951,12 @@ function renderSidebar(qs){
     const lead=qc.reduce((a,b)=>a.prog>b.prog?a:b);
     const trail=qc.reduce((a,b)=>a.prog<b.prog?a:b);
     const script=`${boat.label.toUpperCase()}, RACE CONTROL — `+
-      `Quartile: ${qc.map(c=>c.name).join(' / ')}. `+
+      `Assigned: ${qc.map(c=>c.name).join(' / ')}. `+
       `Lead crew ${lead.name} at ${(lead.prog*TOTAL).toFixed(1)} km. `+
       `Trail crew ${trail.name} at ${(trail.prog*TOTAL).toFixed(1)} km. `+
-      `Sector span ${span.toFixed(1)} km. Acknowledge.`;
+      `Sector span ${span.toFixed(1)} km.`+
+      (gap!=null?` Next group ${gap.toFixed(1)} km astern.`:'')+
+      ` Acknowledge.`;
 
     return `<div class="q-card" style="border-color:${col}">
       <div class="q-header">
@@ -886,6 +966,7 @@ function renderSidebar(qs){
           <div class="q-ais">AIS · ${boat.mmsi}</div>
         </div>
       </div>
+      <div style="padding:2px 12px 4px;font-size:10px;color:#64748b">${qc.length} crew${qc.length!==1?'s':''}${gapTxt}</div>
       <div class="crew-list">${rows}</div>
       <div class="radio">
         <div class="radio-label">📻 Radio Script</div>
@@ -1334,6 +1415,9 @@ function stopLiveMode(){
 }
 
 render();
+
+// reflect the current zone-assignment mode on its button
+(function(){ const b=document.getElementById('btn-assign'); if(b) b.textContent = assignMode==='gap'?'◑ Zones: Gap-aware':'◐ Zones: Even count'; })();
 
 // ── RACE MODE ────────────────────────────────────────────────
 // The deployed build defaults to race mode: auto-start Live Mode on the real

@@ -386,14 +386,48 @@ function ll2prog(lat, lon){
 
 // ---- crew state + quartiles (from dashboard) ----
 let crews=[];
-function quartiles(){
-  const s=[...crews].sort((a,b)=>b.prog-a.prog);
-  const q=Math.ceil(s.length/4);
-  let r=1;
-  const qs=[s.slice(0,q),s.slice(q,2*q),s.slice(2*q,3*q),s.slice(3*q)];
-  qs.forEach(g=>g.forEach(c=>c.rank=r++));
-  return qs;
+// Boat assignment — SAME logic as the umpire dashboard. Gap-aware by default
+// (balanced min-max-span partition of the position-sorted field into 4 zones,
+// so the largest zone is minimised); ?assign=count forces the old equal-count.
+let assignMode = new URLSearchParams(location.search).get('assign')==='count' ? 'count' : 'gap';
+
+function rankSorted(){
+  const s=[...crews].filter(c=>c.prog!=null).sort((a,b)=>b.prog-a.prog);
+  s.forEach((c,i)=>c.rank=i+1);
+  return s;
 }
+function quartilesCount(){
+  const s=rankSorted();
+  const q=Math.max(1,Math.ceil(s.length/4));
+  return [s.slice(0,q),s.slice(q,2*q),s.slice(2*q,3*q),s.slice(3*q)];
+}
+function quartilesGap(){
+  const s=rankSorted();
+  const n=s.length;
+  if(n===0) return [[],[],[],[]];
+  if(n<=4){ const g=[[],[],[],[]]; s.forEach((c,i)=>g[i].push(c)); return g; }
+  const K=4;
+  const prog=s.map(c=>c.prog);
+  const span=(a,b)=>(prog[a]-prog[b])*TOTAL;
+  const INF=Infinity;
+  const dp=Array.from({length:K+1},()=>new Array(n+1).fill(INF));
+  const cut=Array.from({length:K+1},()=>new Array(n+1).fill(0));
+  dp[0][0]=0;
+  for(let k=1;k<=K;k++){
+    for(let i=1;i<=n;i++){
+      for(let j=k-1;j<i;j++){
+        if(dp[k-1][j]===INF) continue;
+        const cand=Math.max(dp[k-1][j], span(j,i-1));
+        if(cand<dp[k][i]){ dp[k][i]=cand; cut[k][i]=j; }
+      }
+    }
+  }
+  const groups=[]; let i=n, k=K;
+  while(k>0){ const j=cut[k][i]; groups.unshift(s.slice(j,i)); i=j; k--; }
+  while(groups.length<4) groups.push([]);
+  return groups;
+}
+function quartiles(){ return assignMode==='gap' ? quartilesGap() : quartilesCount(); }
 
 // ---- params ----
 const params=new URLSearchParams(location.search);
