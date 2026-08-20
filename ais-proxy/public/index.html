@@ -833,6 +833,18 @@ function render(){
         .bindTooltip(`<b>${c.name}</b><br/>Rank #${c.rank}  •  ${c.sog.toFixed(1)} km/h<br/>${((1-c.prog)*TOTAL).toFixed(1)} km to finish${isSOS?'<br/><b style="color:#ef4444">⚠ SOS ACTIVE</b>':''}`,
           {direction:'top',offset:[0,-14],opacity:.95});
       cMarkers.push(m);
+      // raw GPS vs course-projected: faint dot + leash, drawn only when they
+      // diverge (>150 m) so it self-hides on the water and shows up on a land
+      // test or an off-course crew (leash/dot go red when >1.5 km off course).
+      if(c.lat!=null && c.lon!=null){
+        const raw=[c.lat,c.lon];
+        if(hav(raw,pos)>0.15){
+          const rc=(c.distOffCourseKm!=null && c.distOffCourseKm>1.5)?'#ef4444':'#38bdf8';
+          cMarkers.push(L.polyline([raw,pos],{color:rc,weight:1,opacity:.5,dashArray:'2,4'}).addTo(map));
+          cMarkers.push(L.circleMarker(raw,{radius:4,color:rc,weight:1.5,opacity:.9,fillColor:rc,fillOpacity:.35}).addTo(map)
+            .bindTooltip(`<b>${c.name}</b> — raw GPS<br/>${c.lat.toFixed(4)}°N ${Math.abs(c.lon).toFixed(4)}°W`,{direction:'top'}));
+        }
+      }
     });
 
     // safety boat marker — SIMULATED (demo mode only). In live mode, real
@@ -1351,6 +1363,7 @@ async function pollLiveRace(){
         sog,
         prog: proj.prog,
         distOffCourseKm: proj.distFromRouteKm,
+        lat: p.lat, lon: p.lon,        // raw GPS, for the actual-vs-projected overlay
       });
     });
 
