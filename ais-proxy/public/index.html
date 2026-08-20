@@ -130,7 +130,7 @@ button:disabled{opacity:.5;cursor:default;filter:none}
   <div class="chip"><span>Leader </span><strong id="s-leader">—</strong></div>
   <div class="chip"><span>Sweeper </span><strong id="s-sweep">—</strong></div>
   <div class="chip"><span>Max response </span><strong id="s-resp">—</strong></div>
-  <div id="clock">T + 4:30:00</div>
+  <div id="clock">—</div>
 </div>
 
 <div id="ferry-bar"></div>
@@ -466,28 +466,7 @@ const ROUTE=[
 ];
 
 // ── SAMPLE CREW DATA (YB trackers) ──────────────────────────
-const SEED=[
-  {id:1, name:"UVic Vikes",          sog:11.4, prog:0.875},
-  {id:2, name:"False Creek RC",       sog:10.8, prog:0.851},
-  {id:3, name:"Victoria City RC",     sog:10.6, prog:0.833},
-  {id:4, name:"Vancouver RC",         sog:10.4, prog:0.816},
-  {id:5, name:"Seattle Coastal",      sog:10.2, prog:0.799},
-  {id:6, name:"Burrard Bridge RC",    sog:10.0, prog:0.778},
-  {id:7, name:"Port Moody RC",        sog: 9.8, prog:0.761},
-  {id:8, name:"Gulf Islands RC",      sog: 9.6, prog:0.743},
-  {id:9, name:"Nanaimo RC",           sog: 9.4, prog:0.724},
-  {id:10,name:"Kelowna RC",           sog: 9.2, prog:0.706},
-  {id:11,name:"Cowichan RC",          sog: 9.0, prog:0.685},
-  {id:12,name:"Tsawwassen RC",        sog: 8.9, prog:0.666},
-  {id:13,name:"Kitsilano RC",         sog: 8.7, prog:0.648},
-  {id:14,name:"Burnaby Lake RC",      sog: 8.6, prog:0.629},
-  {id:15,name:"New Westminster RC",   sog: 8.4, prog:0.611},
-  {id:16,name:"White Rock Coastal",   sog: 8.2, prog:0.590},
-  {id:17,name:"Delta RC",             sog: 8.1, prog:0.571},
-  {id:18,name:"Chilliwack RC",        sog: 8.0, prog:0.553},
-  {id:19,name:"Salt Spring Coastal",  sog: 7.9, prog:0.564},
-  {id:20,name:"Whistler RC",          sog: 7.8, prog:0.544},
-];
+const SEED=[];   // demo fleet removed for race day — dashboard shows live data only
 
 const Q_COLORS=['#22c55e','#3b82f6','#f59e0b','#ef4444'];
 const Q_NAMES=['Q1 — Leading','Q2 — Mid-Front','Q3 — Mid-Rear','Q4 — Sweep'];
@@ -813,9 +792,7 @@ function render(){
   document.getElementById('v-leader').innerHTML=(leader.prog*TOTAL).toFixed(1)+'<span class="unit"> km</span>';
   document.getElementById('v-sweep').innerHTML=sweeper.sog.toFixed(1)+'<span class="unit"> km/h</span>';
 
-  // clock
-  const h=Math.floor(secs/3600),m=Math.floor((secs%3600)/60),s=secs%60;
-  document.getElementById('clock').textContent=`T + ${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  // (top-bar clock is a live wall-clock — see tickClock() near the bottom)
 
   // crew + safety boat markers
   qs.forEach((qc,qi)=>{
@@ -1284,7 +1261,7 @@ async function loadLiveRace(){
 // reports, so live mode still works without this — it's just friendlier
 // with it filled in.
 const TRACKER_ID_MAP = {
-  // 3484: "UVic Vikes",
+  // 3484: "Crew name",
 };
 
 // SAFETY_BOAT_IDS: which YB tracker ids belong to the SAFETY LAUNCHES (not
@@ -1428,6 +1405,10 @@ function stopLiveMode(){
 }
 
 render();
+
+// live wall-clock in the top bar (replaces the old demo "T +" timer)
+function tickClock(){ const el=document.getElementById('clock'); if(el) el.textContent=new Date().toLocaleTimeString(); }
+tickClock(); setInterval(tickClock,1000);
 
 // reflect the current zone-assignment mode on its button
 (function(){ const b=document.getElementById('btn-assign'); if(b) b.textContent = assignMode==='gap'?'◑ Zones: Gap-aware':'◐ Zones: Even count'; })();
