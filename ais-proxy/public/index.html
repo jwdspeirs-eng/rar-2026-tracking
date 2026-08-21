@@ -1319,13 +1319,16 @@ async function pollLiveRace(){
         ?? (prev ? prev.sog : 8.0);
       lastFixByTracker.set(b.id, {lat:p.lat, lon:p.lon, timestamp:p.timestamp, sog});
 
-      // Safety launches: raw GPS, kept out of the quartile ranking + course projection.
-      const sb = SAFETY_BOAT_IDS[b.id];
-      if(sb){
+      // Safety launches: auto-detected by YB's "Safety" tag (b.classNames) OR the
+      // manual SAFETY_BOAT_IDS list. Plotted at raw GPS, kept OUT of the quartile
+      // ranking + course projection.
+      const sbCfg = SAFETY_BOAT_IDS[b.id];
+      const isSafety = sbCfg!=null || (Array.isArray(b.classNames) && b.classNames.some(n=>/safety/i.test(n)));
+      if(isSafety){
         newSafety.push({
           id: b.id,
-          label: sb.label || TRACKER_ID_MAP[b.id] || b.name,
-          mmsi: sb.mmsi || null,
+          label: (sbCfg && sbCfg.label) || TRACKER_ID_MAP[b.id] || b.name,
+          mmsi: (sbCfg && sbCfg.mmsi) || null,
           lat: p.lat, lon: p.lon, sog,
           timestamp: p.timestamp,
         });

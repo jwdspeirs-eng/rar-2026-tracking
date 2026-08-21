@@ -481,7 +481,7 @@ async function poll(){
     const next=[];
     race.boats.forEach(b=>{
       const p=b.latest(); if(!p) return;
-      if(SAFETY_BOAT_IDS[b.id]) return;           // skip safety launches
+      if(SAFETY_BOAT_IDS[b.id] || (Array.isArray(b.classNames) && b.classNames.some(n=>/safety/i.test(n)))) return;   // skip safety launches (YB "Safety" tag)
       const proj=ll2prog(p.lat,p.lon);
       next.push({
         id:b.id,
